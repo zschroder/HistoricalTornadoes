@@ -5,13 +5,14 @@ date: "1/13/2022"
 output: html_document
 ---
 
+Install the packages needed to clean the data. 
 ```{r}
 #install.packages("sf")
-library(sf)
-library(dplyr)
+suppressMessages(library(sf))
+suppressMessages(library(dplyr))
 suppressMessages(library(lubridate))
 ```
-
+Load the original Significant Tornado data into this session. 
 ```{r}
 SigTor <- st_read("C:/Users/SCHRODEZ/Desktop/Research_Projects/HistoricalTornadoes/SignificantTornadoesData/SignificantTornadoes.shp")
 str(SigTor)
@@ -78,19 +79,42 @@ install.packages("lutz")
 library(lutz)
 timezones <- as.data.frame(tz_list())
 
-
 SigTor.sfdf <- SigTor.sfdf %>% 
-  mutate(tz_name = tz_lookup(SigTor.sfdf), 
-         tz = )
+  mutate(tz_name = tz_lookup(SigTor.sfdf))
 
-for (i in length(SigTor.sfdf)) {
-  tz = SigTor.sfdf[i, 28] 
-  test = SigTor.sfdf %>%
-    filter(tz_name == tz)
-  zones = test$zone
-  dat = c(dat, zones)
+test <- as.data.frame(timezones) %>%
+  filter(tz_name %in% SigTor.sfdf$tz_name) 
+
+Mo_DT <- c(4:10)
+Mo_ST <- c(1:2, 12)
+Day_DST <- c(13, 6)
+
+TZ_Abbr = c()
+
+heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
+  tz = st_drop_geometry(SigTor.sfdf[i, 28]) 
+    bonjour <- test %>%
+      filter(tz_name == tz$tz_name) 
+    bonjour <-  as.data.frame(bonjour)
+    
+    TZAbbr <- if (SigTor.sfdf$Month[i] %in% Mo_DT) {
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] %in% Mo_ST) {
+      bonjour[2,1]
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] > 13){
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] <= 13){
+      bonjour[2,1]
+    }  else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] > 6){
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] <= 6){
+      bonjour[2,1]
+    }
+    TZ_Abbr <- append(TZ_Abbr, TZAbbr)
+
+  }
   
-}
+  
 ```
 
 
