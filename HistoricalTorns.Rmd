@@ -160,7 +160,7 @@ SigTor.sfdf <- cbind(SigTor.sfdf, NARRday, NARRZtime)
 
 ```{r, eval = FALSE}
 #Tornado Start Points
-#save(SigTor.sfdf, file = "HistoricalTornadoTouchDowns.RData")
+#save(SigTor.sfdf, file = "HistoricalTornadoes.RData")
 
 #Tornado Tracks
 SigTorTracks.sfdf <- cbind(SigTor2, SigTor.sfdf[19:32])
@@ -168,8 +168,8 @@ SigTorTracks.sfdf <- cbind(SigTor2, SigTor.sfdf[19:32])
 ```
 
 ```{r}
-load("HistoricalTornadoTouchDowns.RData")
-load("HistoricalTornadoTracks.RData")
+load("HistoricalTornadoes.RData")
+load("HistoricalTornadoTracks.RData") 
 ```
 
 
