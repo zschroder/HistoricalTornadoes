@@ -11,14 +11,20 @@ Install the packages needed to clean the data.
 suppressMessages(library(sf))
 suppressMessages(library(dplyr))
 suppressMessages(library(lubridate))
+suppressMessages(library(lutz))
+suppressMessages(library(xts))
+suppressMessages(library(chron))
 ```
+
 Load the original Significant Tornado data into this session. 
-```{r}
+```{r, eval = FALSE}
 SigTor <- st_read("C:/Users/SCHRODEZ/Desktop/Research_Projects/HistoricalTornadoes/SignificantTornadoesData/SignificantTornadoes.shp")
 str(SigTor)
+
+SigTor2 <- SigTor
 ```
 Correcting time: 
-```{r}
+```{r, eval = FALSE}
 newdat <- SigTor %>%
           mutate(scaledhour = ifelse( time <= 2300, time + 100, time - 2300),
                  hr_plus1 = format(strptime(substr(as.POSIXct(sprintf("%04.0f", scaledhour), format="%H%M"), 12, 16), '%H:%M'), '%H:%M'),
@@ -26,19 +32,19 @@ newdat <- SigTor %>%
                  Time = format(as.POSIXct(hrtime), format = "%H:%M:%S"))
 
 str(newdat)
-Time <- newdat$Time
+LocalTime <- newdat$Time
 
-SigTor <- as.data.frame(cbind(SigTor, Time))
+SigTor <- as.data.frame(cbind(SigTor, LocalTime))
 ```
 Separate the date: 
 
-```{r}
+```{r, eval = FALSE}
 
 SigTor <- SigTor %>%
-  mutate(DateTime = as.POSIXct(paste(Year, Month, Day, Time), format = "%Y%m%d%H"),
-         Hour = hour(DateTime),
-         cDateTime = DateTime - as.difftime(6, unit = "hours"),
-         cDate = as.Date(as_datetime(ifelse(Hour < 6, (DateTime - 86400), cDateTime), tz = Sys.timezone())),
+  mutate(local_DateTime = as.POSIXct(paste(Year, Month, Day, LocalTime), format = "%Y%m%d%H"),
+         LocalHour = hour(local_DateTime),
+         cDateTime = local_DateTime - as.difftime(6, unit = "hours"),
+         cDate = as.Date(as_datetime(ifelse(LocalHour < 6, (local_DateTime - 86400), cDateTime), tz = Sys.timezone())),
          cas = inj + fat,
          AreaPath = len * wid,
          Ma = factor(month.abb[Month], levels = month.abb[1:12])) %>%
@@ -49,7 +55,7 @@ SigTor <- rename(SigTor, time24hr = time)
 ```
 
 where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
-```{r}
+```{r, eval = FALSE}
 perc <- c(1, 0, 0, 0, 0, 0, 
           .772, .228, 0, 0, 0, 0,
           .616, .268, .115, 0, 0, 0,
@@ -67,149 +73,104 @@ SigTor <- SigTor %>%
   mutate(ED = EW3 * AreaPath) #Units of ______
 ``` 
 
-```{r}
+```{r, eval = FALSE}
 SigTor.sfdf <- st_drop_geometry(SigTor)
 
 SigTor.sfdf <- SigTor.sfdf %>%
   st_as_sf(coords = c("slon", "slat"), crs = 4326)
-SigTor.sfdf <- cbind(SigTor.sfdf, SigTor$slat, SigTor$slon)
+slat <- SigTor$slat
+slon = SigTor$slon
 
+SigTor.sfdf <- cbind(SigTor.sfdf, slat, slon)
+```
 
-install.packages("lutz")
-library(lutz)
-timezones <- as.data.frame(tz_list())
+```{r, eval = FALSE}
+#install.packages("lutz")
 
 SigTor.sfdf <- SigTor.sfdf %>% 
   mutate(tz_name = tz_lookup(SigTor.sfdf))
 
-test <- as.data.frame(timezones) %>%
+timezones <- as.data.frame(tz_list())
+US_tz <- as.data.frame(timezones) %>%
   filter(tz_name %in% SigTor.sfdf$tz_name) 
+```
 
+```{r, eval = FALSE}
 Mo_DT <- c(4:10)
 Mo_ST <- c(1:2, 12)
 Day_DST <- c(13, 6)
 
-TZ_Abbr = c()
+timezone = c()
+Zulu_DateTime = c()
 
 heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
-  tz = st_drop_geometry(SigTor.sfdf[i, 28]) 
-    bonjour <- test %>%
+  tz = st_drop_geometry(SigTor.sfdf[i,28]) #tz_name column in #28 
+    bonjour <- US_tz %>%
       filter(tz_name == tz$tz_name) 
     bonjour <-  as.data.frame(bonjour)
     
     TZAbbr <- if (SigTor.sfdf$Month[i] %in% Mo_DT) {
       bonjour[2,2]
     } else if (SigTor.sfdf$Month[i] %in% Mo_ST) {
-      bonjour[2,1]
+      bonjour[1,2]
     } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] > 13){
       bonjour[2,2]
     } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] <= 13){
-      bonjour[2,1]
+      bonjour[1,2]
     }  else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] > 6){
       bonjour[2,2]
     } else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] <= 6){
-      bonjour[2,1]
+      bonjour[1,2]
     }
-    TZ_Abbr <- append(TZ_Abbr, TZAbbr)
+    timezone <- append(timezone, TZAbbr)
 
-  }
-  
-  
+    ZuluTime <- if (SigTor.sfdf$Month[i] %in% Mo_DT) {
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] %in% Mo_ST) {
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] > 13){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] <= 13){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    }  else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] > 6){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] <= 6){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    }
+    Zulu_DateTime <- append(Zulu_DateTime, ZuluTime)    
+}
+
+SigTor.sfdf <- cbind(SigTor.sfdf, as.data.frame(timezone), as.data.frame(Zulu_DateTime))
+```
+
+```{r, eval = FALSE}
+SigTor.sfdf <- SigTor.sfdf %>%
+  mutate(Time_CST = Zulu_DateTime - 3600 * 6)
 ```
 
 
+```{r, eval = FALSE}
+SigTor.sfdf$Zulu_DateTime <- force_tz(SigTor.sfdf$Zulu_DateTime, tzone = "UTC")
+NARRtime <- align.time(SigTor.sfdf$Zulu_DateTime, n = (60 * 60 * 3)) - 3600 * 3 ###Had to remove the -3600*3
+NARRday = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+NARRZtime = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
 
-tz_list()
-
-
-
-
-
-
-
-
-
-
-```{r}
-EST <- c("CT", "DE", "DC", "GA", "ME", "MD", "MA", "NH", "NJ", "NY", "NC", "OH", "PA", "RI", "SC", "VT", "VA", "WV")
-CST <- c("AL", 'AR', "IL", "IA", "LA", "MN", "MS", "MO", "OK", "WI")
-AKST <- c("AK")
-MST <- c("AZ","CO","MT", "NM", "UT", "WY")
-PST <- c("CA", "WA")
-
-
+SigTor.sfdf <- cbind(SigTor.sfdf, NARRday, NARRZtime)
 ```
 
-```{r}
-FL_CST <- c("ESCAMBIA", "SANTA ROSA", "ESCAMBIA /SANTA ROSA", "ESCAMBIA /SANTA ROSA. FL /ESCAMBIA. AL", "ESCAMBIA ,FL /ESCAMBIA. AL", "OKALOOSA", "WALTON", "HOLMES", "WASHINGTON", "BAY", "JACKSON", "CALHOUN", "BAY /CALHOUN /JACKSON", "GULF", "HOLMES /WASHINGTON", "JACKSON. FL /HOUSTON. AL", "SANTA ROSA /OKALOOSA")
-FLtorns <- SigTor %>%
-  filter(st == "FL") %>%
-  mutate(tz = ifelse(county %in% FL_CST, "CST", "EST"))
-```
+```{r, eval = FALSE}
+#Tornado Start Points
+#save(SigTor.sfdf, file = "HistoricalTornadoTouchDowns.RData")
 
-```{r}
-ID_PST <- c("BENEWAH", "BONNER", "BOUNDARY", "CLEARWATER", "KOOTNAI", "LATAH", "LEWIS", "NEZ PERCE", "SHOSHONE", "IDAHO")
-IDtorns <- SigTor %>%
-  filter(st == "ID") %>%
-  mutate(tz = ifelse(county %in% ID_PST, "PST", "MST"))
-```
-
-```{r}
-IN_CST <- c("LAKE", "PORTER", 'LAPORTE', 'STARKE', 'NEWTON', "JASPER", "KNOX", "DAVIESS", "MARTIN", "PIKE", "DUBOIS", "GIBSON", "POSEY", "VANDERBURGH", "WARRICK", "SPENCER", "PERRY", "GIBSON /PIKE", "	KNOX /DAVIESS", "	LAKE /NEWTON", "LAKE /PORTER", 	"LAKE /PORTER /LAPORTE", "VANDERBURGH /GIBSON", "VANDERBURGH/WARRICK")
-INtorns <- SigTor %>%
-  filter(st == "IN") %>%
-  mutate(tz = ifelse(county %in% IN_CST, "CST", "EST"))
+#Tornado Tracks
+SigTorTracks.sfdf <- cbind(SigTor2, SigTor.sfdf[19:32])
+#save(SigTor.sfdf, file = "HistoricalTornadoTracks.RData")
 ```
 
 ```{r}
-KS_MST <- c("GREELEY", "HAMILTON", "SHERMAN", "WALLACE", "SHERMAN /THOMAS")
-KStorns <- SigTor %>%
-  filter(st == "KS") %>%
-  mutate(tz = ifelse(county %in% KS_MST, "MST", "CST"))
+load("HistoricalTornadoTouchDowns.RData")
+load("HistoricalTornadoTracks.RData")
 ```
-
-```{r}
-KY_CST <- c("ADAIR", "ALLEN", "BALLARD", "BARREN", "BRECKINRIDGE", "BUTLER", "CALDWELL", "CALLOWAY", "CARLISLE", "CHRISTIAN", "CLINTON", "CRITTENDEN", "CUMBERLAND", "DAVIESS", "EDMONSON", "FULTON", "GRAVES", "GRAYSON", "GREEN", "HANCOCK", "HART", "HENDERSON", "HICKMAN", "HOPKINS", "LIVINGSTON", "LOGAN", "LYON", "MCCRACKEN", "MCLEAN", "MARSHALL", "METCALFE", "MONROE", "MUHLENBERG", 'OHIO', "RUSSELL", "SIMPSON", "TODD", "TRIGG", "UNION", "WARREN", "WEBSTER", "ALIEN /BARREN", "BARRON /METCALFE", "BUTLER /WARREN", "CALDWELL /HOPKINS", "CALLOWAY /MARSHALL", "CALLOWAY /MARSHALL /TRIGG /CALDWELL /CHRISTIAN", "CHRISTIAN /TODD", "CLINTON /WAYNE", "CRITTENDEN /WEBSTER /HENDERSON", "CUMBERLAND /CLINTON /WAYNE", "DAVIES /HANCOCK", "DAVIES. KY /SPENCER. IN", "DAVIESS /HANCOCK, KY /PERRY. IN	
-", GRAVES /MARSHALL, GRAYSON /HARDIN, 	GREEN /ADAIR, GREEN /TAYLOR, HENDERSON /DAVIESS, 	HICKMAN /GRAVES, HOPKINS /MUHLENBERG /OHIO, LIVINGSTON /LYON /CALDWELL, MARSHALL /LYON /CALDWELL, MARSHALL /LYONS, MCCRACKEN. KY    /MASSAC /POPE. IL /LIVINGSTON CRITTENDEN /WEBSTER /MCLEAN /DAVIESS, KY, 	MCCRACKEN. KY /MASSAC. IL, MONROE /CUMBERLAND /ADAIR /RUSSELL, 	METCALF /ADAIR, MUHLENBERG /BUTLER, MUHLENBERG /BUTLER /WARREN, MUHLENBERG /OHIO, 	OHIO /GRAYSON /BRECKINRIDGE /HARDIN )
-KYtorns <- SigTor %>%
-  filter(st == "KY") %>%
-  mutate(tz = ifelse(county %in% KY_CST, "CST", "EST"))
-```
-
-```{r}
-MI_CST <- c("DICKINSON", "GOGEBIC", "IRON", "MENOMEE")
-```
-
-```{r}
-NE_MST <- c("ARTHUR", "BANNER", "BOX BUTTE", "CHASE", "CHERRY", "CHEYENNE", "DAWES", "DEUEL", "DUNDY", "GARDEN", "GRANT", "HOOKER", "KEITH", "KIMBALL", "MORRILL", "PERKINS", "SCOTTS BLUFF", "SHERIDAN", "SIOUX")
-```
-
-```{r}
-NV_MST <- c("ELKO")
-```
-
-```{r}
-ND_MST <- c("BOWMAN", "ADAMS", "SLOPE", "HETTINGER", "GRANT", "STARK", "BILLINGS", "GOLDEN VALLEY")
-```
-
-```{r}
-OR_MST <- c("MALHEUR")
-```
-
-```{r}
-SD_MST <- c("BENNETT", "BUTTE", "CORON", "CUSTER", "DEWEY", "FALL RIVER", "HAAKON", "HARDING", "JACKSON", "HONES", "LAWRENCE", "MEADE", "MELLETTE", "PENNINGTON", "PERKINS", "SHANNON", 'STANLEY', "TODD", "ZIEBACH")
-```
-
-```{r}
-TN_EST <- c("ANDERON", "BLOUNT", "BRADLEY", 'CAMPBELL', "CARTER", "CLAIBORNE", "COCKE", 'GRAINGER', "GREENE", "HAMBLEN", "HAMILTON", "HANCOCK", "HAWKINS", "JEFFERSON", "JOHNSON", "KNOX", "LOUDON", "MCMINN", "MEIGS", "MONROE", "MORGAN", "POLK", "RHEA", "ROANE", "SCOTT", "SEVIER", "SULLIVAN", "UNICOI", "UNION", "WASHINGTON")
-```
-
-```{r}
-TX_MST <- c("EL PASO", "HUDSPETH")
-```
-
-
-
 
 
 
