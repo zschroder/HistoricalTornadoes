@@ -1,0 +1,205 @@
+---
+title: "HistoricalTorns"
+author: "Zoe Schroder"
+date: "1/13/2022"
+output: html_document
+---
+
+Install the packages needed to clean the data. 
+```{r}
+#install.packages("sf")
+suppressMessages(library(sf))
+suppressMessages(library(dplyr))
+suppressMessages(library(lubridate))
+suppressMessages(library(lutz))
+suppressMessages(library(xts))
+suppressMessages(library(chron))
+```
+
+Load the original Significant Tornado data into this session. 
+```{r, eval = FALSE}
+SigTor <- st_read("C:/Users/SCHRODEZ/Desktop/Research_Projects/HistoricalTornadoes/SignificantTornadoesData/SignificantTornadoes.shp")
+str(SigTor)
+
+SigTor_geom <- SigTor$geometry
+```
+Correcting time: 
+```{r, eval = FALSE}
+newdat <- SigTor %>%
+          mutate(scaledhour = ifelse( time <= 2300, time + 100, time - 2300),
+                 hr_plus1 = format(strptime(substr(as.POSIXct(sprintf("%04.0f", scaledhour), format="%H%M"), 12, 16), '%H:%M'), '%H:%M'),
+                hrtime = strptime(hr_plus1, format="%H:%M") - 3600,
+                 Time = format(as.POSIXct(hrtime), format = "%H:%M:%S"))
+
+str(newdat)
+LocalTime <- newdat$Time
+
+SigTor <- as.data.frame(cbind(SigTor, LocalTime))
+```
+Separate the date: 
+
+```{r, eval = FALSE}
+
+SigTor <- SigTor %>%
+  mutate(local_DateTime = as.POSIXct(paste(Year, Month, Day, LocalTime), format = "%Y%m%d%H"),
+         LocalHour = hour(local_DateTime),
+         cDateTime = local_DateTime - as.difftime(6, unit = "hours"),
+         cDate = as.Date(as_datetime(ifelse(LocalHour < 6, (local_DateTime - 86400), cDateTime), tz = Sys.timezone())),
+         cas = inj + fat,
+         AreaPath = len * wid,
+         Ma = factor(month.abb[Month], levels = month.abb[1:12])) %>%
+  sf::st_sf()
+dim(SigTor)[1]
+
+SigTor <- rename(SigTor, time24hr = time)
+```
+
+where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
+```{r, eval = FALSE}
+perc <- c(1, 0, 0, 0, 0, 0, 
+          .772, .228, 0, 0, 0, 0,
+          .616, .268, .115, 0, 0, 0,
+          .529, .271, .133, .067, 0, 0,
+          .543, .238, .131, .056, .032, 0,
+          .538, .223, .119, .07, .033, .017)
+percM <- matrix(perc, ncol = 6, byrow = TRUE)
+threshW <- c(29.06, 38.45, 49.62, 60.8, 74.21, 89.41)
+midptW <- c(diff(threshW)/2 + threshW[-length(threshW)], threshW[length(threshW)] + 7.5)
+mag_num <- as.numeric(substr(SigTor$mag,2,2))
+ef <- mag_num + 1 
+EW3 <- numeric()
+for(i in 1:length(ef)) EW3[i] = midptW^3 %*% percM[ef[i], ]
+SigTor <- SigTor %>%
+  mutate(ED = EW3 * AreaPath) #Units of ______
+``` 
+
+```{r, eval = FALSE}
+SigTor.sfdf <- st_drop_geometry(SigTor)
+
+SigTor.sfdf <- SigTor.sfdf %>%
+  st_as_sf(coords = c("slon", "slat"), crs = 4326)
+slat <- SigTor$slat
+slon = SigTor$slon
+
+SigTor.sfdf <- cbind(SigTor.sfdf, slat, slon)
+```
+
+```{r, eval = FALSE}
+#install.packages("lutz")
+
+SigTor.sfdf <- SigTor.sfdf %>% 
+  mutate(tz_name = tz_lookup(SigTor.sfdf))
+
+timezones <- as.data.frame(tz_list())
+US_tz <- as.data.frame(timezones) %>%
+  filter(tz_name %in% SigTor.sfdf$tz_name) 
+```
+
+```{r, eval = FALSE}
+Mo_DT <- c(4:10)
+Mo_ST <- c(1:2, 12)
+Day_DST <- c(13, 6)
+
+timezone = c()
+Zulu_DateTime = c()
+
+heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
+  tz = st_drop_geometry(SigTor.sfdf[i,28]) #tz_name column in #28 
+    bonjour <- US_tz %>%
+      filter(tz_name == tz$tz_name) 
+    bonjour <-  as.data.frame(bonjour)
+    
+    TZAbbr <- if (SigTor.sfdf$Month[i] %in% Mo_DT) {
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] %in% Mo_ST) {
+      bonjour[1,2]
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] > 13){
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] <= 13){
+      bonjour[1,2]
+    }  else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] > 6){
+      bonjour[2,2]
+    } else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] <= 6){
+      bonjour[1,2]
+    }
+    timezone <- append(timezone, TZAbbr)
+
+    ZuluTime <- if (SigTor.sfdf$Month[i] %in% Mo_DT) {
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] %in% Mo_ST) {
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] > 13){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] == 3 & SigTor.sfdf$Day[i] <= 13){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    }  else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] > 6){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])
+    } else if (SigTor.sfdf$Month[i] == 11 & SigTor.sfdf$Day[i] <= 6){
+      SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4])
+    }
+    Zulu_DateTime <- append(Zulu_DateTime, ZuluTime)    
+}
+
+SigTor.sfdf <- cbind(SigTor.sfdf, as.data.frame(timezone), as.data.frame(Zulu_DateTime))
+```
+
+```{r, eval = FALSE}
+SigTor.sfdf <- SigTor.sfdf %>%
+  mutate(Time_CST = Zulu_DateTime - 3600 * 6)
+```
+
+
+```{r, eval = FALSE}
+SigTor.sfdf$Zulu_DateTime <- force_tz(SigTor.sfdf$Zulu_DateTime, tzone = "UTC")
+NARRtime <- align.time(SigTor.sfdf$Zulu_DateTime, n = (60 * 60 * 3)) - 3600 * 3 ###Had to remove the -3600*3
+NARRday = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
+NARRZtime = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
+
+SigTor.sfdf <- cbind(SigTor.sfdf, NARRday, NARRZtime)
+```
+
+```{r, eval = FALSE}
+#Tornado Start Points
+#save(SigTor.sfdf, file = "HistoricalTornadoes.RData")
+
+#Tornado Tracks
+SigTorTracks.sfdf <- st_as_sf(cbind(st_drop_geometry(SigTor.sfdf), SigTor_geom))
+#save(SigTorTracks.sfdf, SigTor.sfdf, file = "OriginalTornadoData.RData")
+```
+
+Rearrange 
+```{r}
+geom_points <- SigTor.sfdf$geometry
+geom_tracks <- SigTorTracks.sfdf$geometry
+SigTor.sfdf = st_drop_geometry(SigTor.sfdf)
+SigTorTracks.sfdf = st_drop_geometry(SigTorTracks.sfdf)
+
+Ma <- SigTor.sfdf$Ma
+Time_CST <- SigTor.sfdf$Time_CST
+AreaPath <- SigTor.sfdf$AreaPath
+ED <- SigTor.sfdf$ED
+cas <-  SigTor.sfdf$cas
+cDate <- SigTor.sfdf$cDate
+Zulu_DateTime <-  SigTor.sfdf$Zulu_DateTime
+county <- SigTor.sfdf$county
+
+
+SigTorns <- cbind(SigTor.sfdf[,1:3],  SigTor.sfdf[,11:13], Ma, SigTor.sfdf[,16:18], SigTor.sfdf[,27:28], Time_CST, county, SigTor.sfdf[,5:9], AreaPath, ED, cas, SigTor.sfdf[,14:15], SigTor.sfdf[,25:26], cDate, Zulu_DateTime, SigTor.sfdf[,31:32], geom_points )
+
+Ma <- SigTorTracks.sfdf$Ma
+Time_CST <- SigTorTracks.sfdf$Time_CST
+AreaPath <- SigTorTracks.sfdf$AreaPath
+ED <- SigTorTracks.sfdf$ED
+cas <-  SigTorTracks.sfdf$cas
+cDate <- SigTorTracks.sfdf$cDate
+Zulu_DateTime <-  SigTorTracks.sfdf$Zulu_DateTime
+county <- SigTorTracks.sfdf$county
+
+SigTornTracks <- cbind(SigTorTracks.sfdf[,1:3],  SigTorTracks.sfdf[,11:13], Ma, SigTorTracks.sfdf[,16:18], SigTorTracks.sfdf[,27:28], Time_CST, county, SigTorTracks.sfdf[,5:9], AreaPath, ED, cas, SigTorTracks.sfdf[,14:15], SigTorTracks.sfdf[,25:26], cDate, Zulu_DateTime, SigTorTracks.sfdf[,31:32], geom_tracks)
+```
+
+```{r}
+#save(SigTorns, SigTornTracks, file = "HistoricalTornadoes.RData")
+```
+
+
