@@ -5,7 +5,64 @@ date: "2/1/2022"
 output: html_document
 ---
 
+Library the datasets used in this project: 
 ```{r}
-load("HistorcicalTornadoes.RData")
+suppressMessages(library(ggplot2))
+suppressMessages(library(tmap))
+suppressMessages(library(sf))
+suppressMessages(library(USAboundaries))
+```
+
+Load the data for the Historical Tornado Dataset:
+```{r}
+load("HistoricalTornadoes.RData")
+```
+
+Get the state data for the lower 48 using the `us_states` function from the **USAboundaries** package. 
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+```
+
+Plot the data for the tornado touchdown locations `SigTorns`:
+```{r}
+SigTorns <- st_as_sf(SigTorns)
+
+tm_shape(stateBorders) +
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.1, .1, .1, .1)) +
+tm_shape(SigTorns, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_bubbles(size = 0.1, col = "NARRZtime") +
+      tm_layout(legend.title.size = 1.1,
+            legend.position = c("right", "bottom"), 
+            legend.stack = "horizontal",
+            legend.frame = FALSE, 
+            legend.text.size = 1, legend.width = -0.2)
+```
+
+Plot the tracks of the tornadoes `SigTornTracks`: 
+```{r}
+SigTornTracks <- st_as_sf(SigTornTracks)
+
+tm_shape(stateBorders) +
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.1, .1, .1, .1)) +
+tm_shape(SigTornTracks, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_lines(size = 0.1, col = "NARRZtime") +
+      tm_layout(legend.title.size = 1.1,
+            legend.position = c("right", "bottom"), 
+            legend.stack = "horizontal",
+            legend.frame = FALSE, 
+            legend.text.size = 1, legend.width = -0.2)
 ```
 
