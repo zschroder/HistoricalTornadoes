@@ -10,6 +10,7 @@ Library the datasets used in this project:
 suppressMessages(library(ggplot2))
 suppressMessages(library(tmap))
 suppressMessages(library(sf))
+suppressMessages(library(dplyr))
 suppressMessages(library(USAboundaries))
 ```
 
@@ -64,5 +65,11 @@ tm_shape(SigTornTracks, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1
             legend.stack = "horizontal",
             legend.frame = FALSE, 
             legend.text.size = 1, legend.width = -0.2)
+```
+
+```{r}
+x <- SigTorns %>%
+  group_by(NARRZtime) %>%
+  summarize(count = n())
 ```
 

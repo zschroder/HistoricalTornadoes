@@ -103,8 +103,45 @@ Day_DST <- c(13, 6)
 timezone = c()
 Zulu_DateTime = c()
 
+library(lubridate)
+
+SigTor.sfdf <- SigTor.sfdf %>%
+  mutate(dst = dst(local_DateTime))
+
+
+```
+
+```{r}
+
+timezone = c()
+Zulu_DateTime = c()
+
 heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
-  tz = st_drop_geometry(SigTor.sfdf[i,28]) #tz_name column in #28 
+  tz = (SigTor.sfdf$timezone[i]) #tz_name column in #28 
+    bonjour <- US_tz %>%
+      filter(tz_name == tz) 
+    bonjour <-  as.data.frame(bonjour)
+    
+    TZAbbr <- ifelse(!is.na(SigTor.sfdf$dst[4] == TRUE), bonjour[2,2], bonjour[1,2])
+    timezone <- append(timezone, TZAbbr)
+    
+    ZuluTime <- if (!is.na(SigTor.sfdf$dst[i] == TRUE)){
+      (SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])) 
+      } else if (!is.na(SigTor.sfdf$dst[i] == FALSE)) {
+      (SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4]))
+      } else {
+      NA
+    }
+     ZuluTime2 <- strftime(ZuluTime, '%Y-%m-%d %H:%M:%S')
+     Zulu_DateTime <- append(Zulu_DateTime, ZuluTime2)
+}
+
+SigTor.sfdf <- cbind(SigTor.sfdf, as.data.frame(timezone), as.data.frame(Zulu_DateTime))
+```
+
+```{r}
+heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
+  tz = st_drop_geometry(SigTor.sfdf[i,31]) #tz_name column in #28 
     bonjour <- US_tz %>%
       filter(tz_name == tz$tz_name) 
     bonjour <-  as.data.frame(bonjour)
