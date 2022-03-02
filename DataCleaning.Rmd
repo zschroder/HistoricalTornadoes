@@ -21,9 +21,13 @@ Load the original Significant Tornado data into this session.
 SigTor <- st_read("C:/Users/SCHRODEZ/Desktop/Research_Projects/HistoricalTornadoes/SignificantTornadoesData/SignificantTornadoes.shp")
 str(SigTor)
 
-SigTor_geom <- SigTor$geometry
+#save(SigTor, file = "OriginalTornadoData.RData")
+
+SigTor_geom <- SigTor$geometry #Save the line geometry for later use.
 ```
-Correcting time: 
+
+Create a new data frame. Convert the time to the appropriate POSIXct format. Create a new column called `LocalTime` in the *SigTor* data. 
+%%Correcting time: 
 ```{r}
 newdat <- SigTor %>%
           mutate(scaledhour = ifelse( time <= 2300, time + 100, time - 2300),
@@ -36,8 +40,9 @@ LocalTime <- newdat$Time
 
 SigTor <- as.data.frame(cbind(SigTor, LocalTime))
 ```
-Separate the date: 
 
+Get the appropriate convective day for each of these reports. A convective day is a 24-hour period extending from 6 AM to 6 AM. Calculate the casualties, path of the damage area, and abbreviation of the month. 
+Separate the date: 
 ```{r}
 
 SigTor <- SigTor %>%
@@ -53,8 +58,7 @@ dim(SigTor)[1]
 
 SigTor <- rename(SigTor, time24hr = time)
 ```
-
-where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
+Compute the Energy Dissipation (ED) where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
 ```{r}
 perc <- c(1, 0, 0, 0, 0, 0, 
           .772, .228, 0, 0, 0, 0,
@@ -73,6 +77,7 @@ SigTor <- SigTor %>%
   mutate(ED = EW3 * AreaPath) #Units of ______
 ``` 
 
+Get Tornado touchdown (point) data: 
 ```{r}
 SigTor.sfdf <- st_drop_geometry(SigTor)
 
@@ -84,6 +89,7 @@ slon = SigTor$slon
 SigTor.sfdf <- cbind(SigTor.sfdf, slat, slon)
 ```
 
+Assign the appropriate timezone to the tornado data using the `tz_lookup` function from the **lutz** package. 
 ```{r}
 #install.packages("lutz")
 
@@ -95,24 +101,16 @@ US_tz <- as.data.frame(timezones) %>%
   filter(tz_name %in% SigTor.sfdf$tz_name) 
 ```
 
+Determine whether the DateTime is experiencing standard time or daylight time. Use the `dst` function from the **lubridate** package. 
 ```{r}
-Mo_DT <- c(4:10)
-Mo_ST <- c(1:2, 12)
-Day_DST <- c(13, 6)
-
-timezone = c()
-Zulu_DateTime = c()
-
 library(lubridate)
 
 SigTor.sfdf <- SigTor.sfdf %>%
   mutate(dst = dst(date))
-
-
 ```
 
+Compute the GMT time for each tornado report using the correct conversion and appropriate timezone. 
 ```{r}
-
 timezone = c()
 Zulu_DateTime = c()
 
@@ -145,16 +143,19 @@ heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
 SigTor.sfdf <- cbind(SigTor.sfdf, as.data.frame(timezone), as.data.frame(Zulu_DateTime))
 ```
 
+
+Convert Zulu_DateTime to a POSIXct object. 
 ```{r}
 SigTor.sfdf$Zulu_DateTime <- as.POSIXct(SigTor.sfdf$Zulu_DateTime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
 ```
 
+Standardize all times to CST to remain consistent with the current SPC dataset. 
 ```{r}
 SigTor.sfdf <- SigTor.sfdf %>%
   mutate(Time_CST = Zulu_DateTime - 3600 * 6)
 ```
 
-
+Calculate the NARRtime, NARRday, and NARRZtime for each report. 
 ```{r}
 SigTor.sfdf$Zulu_DateTime <- force_tz(SigTor.sfdf$Zulu_DateTime, tzone = "UTC")
 NARRtime <- align.time(SigTor.sfdf$Zulu_DateTime, n = (60 * 60 * 3)) - 3600 * 3 ###Had to remove the -3600*3
@@ -164,21 +165,18 @@ NARRZtime = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,for
 SigTor.sfdf <- cbind(SigTor.sfdf, NARRday, NARRZtime)
 ```
 
+Establish the geometry for a tornado tracks dataset using the original geometry from the Historical Tornadoes data. 
 ```{r}
-#Tornado Start Points
-#save(SigTor.sfdf, file = "HistoricalTornadoes.RData")
-
 #Tornado Tracks
 SigTorTracks.sfdf <- st_as_sf(cbind(st_drop_geometry(SigTor.sfdf), SigTor_geom))
-#save(SigTorTracks.sfdf, SigTor.sfdf, file = "OriginalTornadoData.RData")
 ```
 
-Rearrange 
+Rearrange the data. Create a tornado touchdown (point) dataset. 
 ```{r}
 geom_points <- SigTor.sfdf$geometry
-geom_tracks <- SigTorTracks.sfdf$geometry
+
 SigTor.sfdf = st_drop_geometry(SigTor.sfdf)
-SigTorTracks.sfdf = st_drop_geometry(SigTorTracks.sfdf)
+
 
 Ma <- SigTor.sfdf$Ma
 Time_CST <- SigTor.sfdf$Time_CST
@@ -189,8 +187,13 @@ cDate <- SigTor.sfdf$cDate
 Zulu_DateTime <-  SigTor.sfdf$Zulu_DateTime
 county <- SigTor.sfdf$county
 
+SigTorns <- cbind(SigTor.sfdf[,1:3],  SigTor.sfdf[,11:13], Ma, SigTor.sfdf[,17:19], Time_CST, county, SigTor.sfdf[,5:9], AreaPath, ED, cas, SigTor.sfdf[,28:29], SigTor.sfdf[,14:15], cDate, Zulu_DateTime, SigTor.sfdf[,30:32], SigTorTracks.sfdf[,35:36], geom_points )
+```
 
-SigTorns <- cbind(SigTor.sfdf[,1:3],  SigTor.sfdf[,11:13], Ma, SigTor.sfdf[,17:19], Time_CST, county, SigTor.sfdf[,5:9], AreaPath, ED, cas, SigTor.sfdf[,28:29], SigTor.sfdf[,14:15], cDate, Zulu_DateTime, SigTor.sfdf[,30:32], geom_points )
+Create a tornado tracks dataset. 
+```{r}
+geom_tracks <- SigTorTracks.sfdf$geometry
+SigTorTracks.sfdf = st_drop_geometry(SigTorTracks.sfdf)
 
 Ma <- SigTorTracks.sfdf$Ma
 Time_CST <- SigTorTracks.sfdf$Time_CST
@@ -201,7 +204,7 @@ cDate <- SigTorTracks.sfdf$cDate
 Zulu_DateTime <-  SigTorTracks.sfdf$Zulu_DateTime
 county <- SigTorTracks.sfdf$county
 
-SigTornTracks <- cbind(SigTorTracks.sfdf[,1:3],  SigTorTracks.sfdf[,11:13], Ma, SigTorTracks.sfdf[,17:19], Time_CST, county, SigTorTracks.sfdf[,5:9], AreaPath, ED, cas, SigTorTracks.sfdf[,28:29], SigTorTracks.sfdf[,14:15], cDate, Zulu_DateTime, SigTorTracks.sfdf[,30:32], geom_tracks)
+SigTornTracks <- cbind(SigTorTracks.sfdf[,1:3],  SigTorTracks.sfdf[,11:13], Ma, SigTorTracks.sfdf[,17:19], Time_CST, county, SigTorTracks.sfdf[,5:9], AreaPath, ED, cas, SigTorTracks.sfdf[,28:29], SigTorTracks.sfdf[,14:15], cDate, Zulu_DateTime, SigTorTracks.sfdf[,30:32], SigTorTracks.sfdf[,35:36], geom_tracks)
 ```
 
 ```{r}
