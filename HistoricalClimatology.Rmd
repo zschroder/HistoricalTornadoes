@@ -16,10 +16,14 @@ suppressMessages(library(lubridate))
 ```
 
 Load the data for the Historical Tornado Dataset. This will include the tornado touchdown locations (`SigTorns`) and the tracks of the tornadoes (`SigTornTracks`). For this research, use the `SigTorns` dataframe. 
-```{r}
+```{r, eval = FALSE}
 load("HistoricalTornadoes.RData")
 ```
 
+```{r, eval = FALSE}
+SigTorns["mag"][SigTorns["mag"] == "FN"] <- "F00"
+SigTorns["mag"][SigTorns["mag"] == "FT"] <- "F00"
+```
 
 Get the state data for the lower 48 using the `us_states` function from the **USAboundaries** package. This will allow the state borders to be added to a map using the *tm_shape* function. 
 ```{r}
@@ -28,7 +32,7 @@ stateBorders <- us_states(states = sts)
 ```
 
 Plot the data for the tornado touchdown locations (`SigTorns`). Add a map of the United States. 
-```{r}
+```{r, eval = FALSE}
 SigTorns <- st_as_sf(SigTorns)
 
 tm_shape(stateBorders) +
@@ -50,12 +54,11 @@ tm_shape(SigTorns, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0
 
 
 Determine the distance between tornadoes in space and time. Use a projection, not lat/lon. See https://epsg.io/102004. Extract the coordinates of the start locations as a N by 2 matrix, where N is the number of tornadoes. Also extract the date-time as a vector of class `POSIXct`.
-```{r}
+```{r, eval = FALSE}
 SigTorns <- st_as_sf(SigTorns)
 st_crs(SigTorns) <- 4326
 SigTorns <- st_transform(SigTorns, crs = 4326)
 
-test <- distfunc(SigTorns)
 space <- st_coordinates(SigTorns)
 time <- as.numeric(SigTorns$Time_CST)
 
@@ -64,7 +67,7 @@ time[is.na(time)] <- 0
 ```
 
 Next compute pairwise Euclidean distances in space and, separately, in time using the `dist()` function. Divide the spatial distance by 15 so that the values are commensurate with the time 'distance' based on the assumption of 15 meters per second (~34 mph) for an average speed of tornado-generating storms. Compare: Distance from New York to Denver is 2.622 x 10^6 meters. There are 3.154 x 10^7 seconds in a year. This will capture the historic multiday tornado outbreaks. For analysis we want to consider each day in the multiday group separately. As the value of the divisor increases cluster areas get larger. Remove `ds` and `dt` to free memory. Distances are saved as an object of class `dist` containing a vector of length N * (N-1)/2, which is the number of unique point pairs.
-```{r}
+```{r, eval = FALSE}
 ds <- dist(space) / 15
 dt <- dist(time)
 dst <- ds + dt
@@ -78,20 +81,20 @@ Next group the tornadoes based on the space-time distances. This is done with th
 The single linkage method (`method = "single"`) is related to the minimal spanning tree (MST) and adopts a 'friends of friends' grouping strategy. An edge-weighted graph is a graph where each edge has a weight (or cost). Here weights are space-time distances between tornadoes. A MST of an edge-weighted graph is a spanning tree whose weight (the sum of the weights of its edges) is no larger than the weight of any other spanning tree. A spanning tree of a graph on N vertices (tornado centroids) is a subset of N-1 edges that form a tree (Skiena 1990, p. 227).
  
 The `cutree()` function is used to extract a group number for each tornado. Tornadoes in each group are close in space & time. Here the tree is cut at a height of 50000 space-time units. Making `h` smaller results in smaller groups (fewer tornadoes per group).
-```{r}
+```{r, eval = FALSE}
 stime <- proc.time()
 tree <- hclust(dst, method = "single")
 groupNumber <- as.integer(cutree(tree, h = 50000))
 proc.time() - stime
 ```
 
-```{r}
+```{r, eval = FALSE}
 SigTorns$groupNumber <- groupNumber
 ```
 
 Compute group-level statistics. 
-```{r}
-Groups.sfdfT <- SigTorns %>%
+```{r, eval = FALSE}
+HistoricalGroups.sfdfT <- SigTorns %>%
   group_by(groupNumber) %>%
   summarize(Year = first(Year),
             Month = first(Month),
@@ -119,8 +122,8 @@ Groups.sfdfT <- SigTorns %>%
 ```
 
 ```{r, eval = FALSE}
-GroupTornadoes <- SigTorns %>%
-  filter(groupNumber %in% Groups.sfdfT$groupNumber)
+HistoricalGroupTornadoes <- SigTorns %>%
+  filter(groupNumber %in% HistoricalGroups.sfdfT$groupNumber)
 ```
 
 ########################################
@@ -128,17 +131,19 @@ GroupTornadoes <- SigTorns %>%
 ########################################
 
 Filter individual tornadoes to remove those that are not part of a large group. Group by group number and convective dates. Remove days having fewer than 10 tornadoes.
-```{r}
-BigDays.sfdfT <- SigTorns %>%
-  filter(groupNumber %in% Groups.sfdfT$groupNumber) %>%
+```{r, eval = FALSE}
+HistoricalBigDays.sfdfT <- SigTorns %>%
+  filter(groupNumber %in% HistoricalGroups.sfdfT$groupNumber) %>%
   group_by(groupNumber, cDate) %>%
-  summarize(nT = n(),
+  summarize(Hour = first(Hour), 
+            nT = n(),
             n0 = sum(mag == "F0"),
             n1 = sum(mag == "F1"),
             n2 = sum(mag == "F2"),
             n3 = sum(mag == "F3"),
             n4 = sum(mag == "F4"),
             n5 = sum(mag == "F5"),
+            maxEF = max(mag),
             ATP = sum(ED),
             maxATP = max(ED),
             avgATP = mean(ED),
@@ -155,71 +160,257 @@ BigDays.sfdfT <- SigTorns %>%
          Month = format(cDate, "%m"), # this is needed to preserve the leading zeros
          Day = format(cDate, "%d"), 
          ATP_TW = ATP/10^12)                                                                              
-dim(BigDays.sfdfT)
+dim(HistoricalBigDays.sfdfT)
 ```
 This follows Trapps paper that defines an outbreak as 6+ torns rated EF2 or higher. 
 
 
-```{r}
+```{r, eval = FALSE}
 #Remove the row with an NA cDate
-test <- na.omit(BigDays.sfdfT$cDate)
+test <- na.omit(HistoricalBigDays.sfdfT$cDate)
 
-BigDays.sfdfT <- BigDays.sfdfT %>%
+HistoricalBigDays.sfdfT <- HistoricalBigDays.sfdfT %>%
   filter(cDate %in% test)
 ```
 
 
 Create a unique ID for each big day and each tornado. Extract the tornadoes associated with each big day using the unique ID.
-```{r}
-BigDayTornadoes <- SigTorns %>%
+```{r, eval = FALSE}
+HistoricalBigDayTornadoes <- SigTorns %>%
    mutate(ID = paste0(gsub("-", "", cDate), groupNumber))
-BigDays.sfdfT <- BigDays.sfdfT %>%
+HistoricalBigDays.sfdfT <- HistoricalBigDays.sfdfT %>%
    mutate(ID = paste0(gsub("-", "", cDate), groupNumber))
 
-BigDayTornadoes <- BigDayTornadoes %>%
-  filter(ID %in% BigDays.sfdfT$ID)
+HistoricalBigDayTornadoes <- HistoricalBigDayTornadoes %>%
+  filter(ID %in% HistoricalBigDays.sfdfT$ID)
 
-sum(BigDays.sfdfT$nT)
+sum(HistoricalBigDays.sfdfT$nT)
 ```
 
-```{r}
-BigDays.sfdfT %>% 
-  group_by(nT) %>%
-  summarize(Count = n())
+Save the Cluster Data into an .RData object. 
+```{r, eval = FALSE}
+#save(HistoricalBigDays.sfdfT, HistoricalBigDayTornadoes, HistoricalGroups.sfdfT, HistoricalGroupTornadoes, file = "HistoricalClusters.RData")
 ```
 
+Load in the Cluster Data of the Historical Tornado Data
 ```{r}
-BigDays.sfdfT %>% 
+load("HistoricalClusters.RData")
+```
+
+December 3, 1978: Get the magnitude from the SPC dataset. It is an F3. 
+
+om	yr	mo	dy	date	time	tz	st	stf	stn	mag	inj	fat	loss	closs	slat	slon	elat	elon	len	wid	
+764	1978	12	3	12/3/1978	2:30:00	3	LA	22	20	3	0	0	0	0	32.7	-93.55	33	-92.58	61.1	10	
+
+
+April 18, 1880: Coded as FN, but suggests F2 damage. Assign an F2 value to the torn. 
+
+
+```{r}
+HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F0"] <- "F2"
+HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F00"] <- "F3"
+```
+
+Separate the data between Weak, Strong, and Significant Tornadoes. 
+```{r}
+WeakTorns <- as.data.frame(HistoricalBigDayTornadoes) %>%
+  filter(mag == "F1")
+StrongTorns <- HistoricalBigDayTornadoes %>%
+  filter(mag == "F2" | mag == "F3")
+SignificantTorns <- HistoricalBigDayTornadoes %>%
+  filter(mag == "F4" | mag == "F5")
+```
+
+
+Plot the data for the tornado touchdown locations (`SigTorns`). Add a map of the United States. Color code the tornadoes by ORANGE: weak (F0, F1), RED: strong(F2, F3), BLACK: significant (F4, F5). 
+```{r}
+tm_shape(stateBorders, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(            attr.position = c("left", "bottom"), 
+            inner.margins = c(.05, .05, .05, .05)) +
+tm_shape(WeakTorns) +
+  tm_bubbles(size = 0.1, col = "blue") +
+tm_shape(StrongTorns) +
+  tm_bubbles(size = 0.1, col = "red") +
+tm_shape(SignificantTorns) +
+  tm_bubbles(size = 0.1, col = "black") 
+      
+```
+
+Create a figure of the tornado cluster density plot for all of the tornadoes (A) and only the strongest tornadoes (B). 
+
+Kernel Density: 
+
+
+```{r}
+devtools::install_github("mtennekes/oldtmaptools")
+
+library(oldtmaptools)
+
+centroids <- st_centroid(HistoricalBigDays.sfdfT)
+```
+
+
+```{r}
+library(ggplot2)
+
+st
+
+ggplot(stateBorders) +
+  geom_sf() + 
+  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
+                 geom = "polygon", data = centroids) 
+```
+
+What is the temporal distribution of tornado clusters? Year on the x axis, counts on the y, stacked bars shaded by maximum F rating. Group by 50 years. 
+
+```{r}
+NumClusbyYear <- HistoricalBigDays.sfdfT %>%
+  group_by(Year, maxEF) %>%
+  summarize(count = n())
+
+ggplot(NumClusbyYear, aes(fill = maxEF, y = count, x = Year)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+
+#Group by 50 years. 
+
+```
+
+Number of tornadoes by month, stacked bars shaded by maximum F rating. 
+
+```{r}
+NumClusbyMonth <- HistoricalBigDays.sfdfT %>%
+  group_by(Month, maxEF) %>%
+  summarize(count = n())
+
+ggplot(NumClusbyMonth, aes(fill = maxEF, y = count, x = Month)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+```
+
+Map of maximum number of tornado days.
+
+```{r}
+HistoricalBigDayTornadoes %>%
   group_by(Month) %>%
-  summarize(Count = n())
+  summarize(numClus = n())
+
+ggplot(stateBorders) +
+  geom_sf() + 
+  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
+                 geom = "polygon", data = HistoricalBigDayTornadoes) +
+  facet_wrap(~Month, ncol = 3)
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-What is the monthly counts of significant historical tornadoes? 
+Figure of the number of clusters for each start hour of the day in CST. 
 
 ```{r}
-SigTorns %>%
-  group_by(Month) %>%
-  summarize(Count = n(), 
-            casualties = sum(cas, na.rm = TRUE), 
-            avgED = mean(ED, na.rm = TRUE))
+NumClusbyHour <- HistoricalBigDays.sfdfT %>%
+  group_by(Hour, maxEF) %>%
+  summarize(count = n())
+
+ggplot(NumClusbyHour, aes(fill = maxEF, y = count, x = Hour)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
 ```
+
+Figure: Separate by summer and winter and plot the clusters by hour. Separate to MAM, DJF, JJA, SON
+
+```{r}
+MAM <- HistoricalBigDays.sfdfT %>%
+  filter(Mo >=  3 & Mo <= 5)
+NumClusbyHour_MAM <- MAM %>%
+  group_by(Hour, maxEF) %>%
+  summarize(count = n())
+
+P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+```
+
+```{r}
+JJA <- HistoricalBigDays.sfdfT %>%
+  filter(Mo >= 6 & Mo <= 8)
+
+NumClusbyHour_JJA <- JJA %>%
+  group_by(Hour, maxEF) %>%
+  summarize(count = n())
+
+P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+
+```
+
+```{r}
+SON <- HistoricalBigDays.sfdfT %>%
+  filter(Mo >= 9 & Mo <= 11)
+
+NumClusbyHour_SON <- SON %>%
+  group_by(Hour, maxEF) %>%
+  summarize(count = n())
+
+P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+```
+
+```{r}
+DJF <- HistoricalBigDays.sfdfT %>%
+  filter(Mo <= 2 | Mo >= 12)
+
+NumClusbyHour_DJF <- DJF %>%
+  group_by(Hour, maxEF) %>%
+  summarize(count = n())
+
+P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  theme_bw()
+```
+
+```{r}
+library(gridExtra)
+grid.arrange(P1, P2, P3, P4)
+```
+
+Distribution of clusters by maximum F rating. 
+
+```{r}
+HistoricalBigDays.sfdfT %>%
+  group_by(maxEF) %>%
+  summarize(count = n()) %>%
+ggplot(aes(fill = maxEF, x = maxEF, y = count)) +
+  geom_bar(stat = "identity") +
+   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) 
+```
+
+Table: Top ten tornado clusters with the highest fatality counts. 
+
+```{r}
+
+```
+
+Figure: Annual # of fatalities from tornadoes with their respective F-scale ratings color coded. 
+
+```{r}
+
+```
+
+Table: Avg # injuries and fatalities per tornado event. Separate by decade and calculate frequency, # fatalities, # of injuries all by rating. 
+
+```{r}
+
+```
+
 
 
