@@ -3,6 +3,8 @@ title: "HistoricalClimatology"
 author: "Zoe Schroder"
 date: "3/21/2022"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 Library the datasets used in this project: 
@@ -213,7 +215,7 @@ HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F00"] <- "F3"
 
 Separate the data between Weak, Strong, and Significant Tornadoes. 
 ```{r}
-WeakTorns <- as.data.frame(HistoricalBigDayTornadoes) %>%
+WeakTorns <- (HistoricalBigDayTornadoes) %>%
   filter(mag == "F1")
 StrongTorns <- HistoricalBigDayTornadoes %>%
   filter(mag == "F2" | mag == "F3")
@@ -261,23 +263,40 @@ st
 ggplot(stateBorders) +
   geom_sf() + 
   stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
-                 geom = "polygon", data = centroids) 
+                 geom = "polygon", data = HistoricalBigDayTornadoes) 
 ```
 
 What is the temporal distribution of tornado clusters? Year on the x axis, counts on the y, stacked bars shaded by maximum F rating. Group by 50 years. 
 
 ```{r}
-NumClusbyYear <- HistoricalBigDays.sfdfT %>%
+NumClusbyYear8035 <- HistoricalBigDays.sfdfT %>%
+  filter(Year < 1935) %>%
   group_by(Year, maxEF) %>%
   summarize(count = n())
 
-ggplot(NumClusbyYear, aes(fill = maxEF, y = count, x = Year)) +
+NumClusbyYear3590 <- HistoricalBigDays.sfdfT %>%
+  filter(Year >= 1935) %>%
+  group_by(Year, maxEF) %>%
+  summarize(count = n())
+
+p1 <- ggplot(NumClusbyYear8035, aes(fill = maxEF, y = count, x = Year)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+  scale_x_continuous(expand = c(0, 0), limits = c(1880, 1935), breaks = seq(1880, 1935, 5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 16), breaks = seq(0, 16,2)) +
+  labs(x = "Year", y = "Number of Clusters") +
+  theme_minimal()
+p1#Group by 50 years.
 
-#Group by 50 years. 
+p2 <- ggplot(NumClusbyYear3590, aes(fill = maxEF, y = count, x = Year)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  scale_x_continuous(expand = c(0, 0), limits = c(1935, 1990), breaks = seq(1935, 1990, 5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 16), breaks = seq(0, 16,2)) +
+  labs(x = "Year", y = "Number of Clusters") +
+  theme_minimal()
 
+grid.arrange(p1, p2)
 ```
 
 Number of tornadoes by month, stacked bars shaded by maximum F rating. 
@@ -290,21 +309,27 @@ NumClusbyMonth <- HistoricalBigDays.sfdfT %>%
 ggplot(NumClusbyMonth, aes(fill = maxEF, y = count, x = Month)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+  scale_x_discrete(expand = c(0, 0), labels = month.abb) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 125), breaks = seq(0, 130,10)) +
+  labs(x = "Month", y = "Number of Clusters") +
+  theme_minimal()
 ```
 
 Map of maximum number of tornado days.
 
 ```{r}
-HistoricalBigDayTornadoes %>%
+centroids %>%
   group_by(Month) %>%
   summarize(numClus = n())
 
 ggplot(stateBorders) +
-  geom_sf() + 
+  geom_sf(fill = NA, color = "gray70") + 
   stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
                  geom = "polygon", data = HistoricalBigDayTornadoes) +
-  facet_wrap(~Month, ncol = 3)
+  facet_wrap(~Ma, ncol = 3) +
+  labs(x = "Longitude", y = "Latitude") +
+  scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
+  theme_minimal()
 ```
 
 Figure of the number of clusters for each start hour of the day in CST. 
@@ -317,7 +342,10 @@ NumClusbyHour <- HistoricalBigDays.sfdfT %>%
 ggplot(NumClusbyHour, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+  scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 80), breaks = seq(0, 80,10)) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal()
 ```
 
 Figure: Separate by summer and winter and plot the clusters by hour. Separate to MAM, DJF, JJA, SON
@@ -332,7 +360,11 @@ NumClusbyHour_MAM <- MAM %>%
 P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+  scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal() +
+  ggtitle("March, April, & May")
 ```
 
 ```{r}
@@ -346,7 +378,11 @@ NumClusbyHour_JJA <- JJA %>%
 P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+    scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal() +
+  ggtitle("June, July, & August")
 
 ```
 
@@ -361,7 +397,11 @@ NumClusbyHour_SON <- SON %>%
 P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+    scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal() +
+  ggtitle("September, October, & November")
 ```
 
 ```{r}
@@ -375,7 +415,11 @@ NumClusbyHour_DJF <- DJF %>%
 P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  theme_bw()
+  scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal() +
+  ggtitle("December, January, & February")
 ```
 
 ```{r}
@@ -391,7 +435,9 @@ HistoricalBigDays.sfdfT %>%
   summarize(count = n()) %>%
 ggplot(aes(fill = maxEF, x = maxEF, y = count)) +
   geom_bar(stat = "identity") +
-   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) 
+   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  labs(x = "Hour (CST)", y = "Number of Clusters") +
+  theme_minimal()
 ```
 
 Table: Top ten tornado clusters with the highest fatality counts. 
