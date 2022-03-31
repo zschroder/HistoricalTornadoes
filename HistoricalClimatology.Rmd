@@ -245,26 +245,34 @@ Create a figure of the tornado cluster density plot for all of the tornadoes (A)
 
 Kernel Density: 
 
-
 ```{r}
-devtools::install_github("mtennekes/oldtmaptools")
-
-library(oldtmaptools)
-
-centroids <- st_centroid(HistoricalBigDays.sfdfT)
+library(maptools)
+library(raster)
 ```
 
 
 ```{r}
 library(ggplot2)
 
-st
-
 ggplot(stateBorders) +
-  geom_sf() + 
-  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
-                 geom = "polygon", data = HistoricalBigDayTornadoes) 
+  geom_sf(fill = NA, col = "gray70") + 
+  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .7, h = 3, 
+                 geom = "polygon", data = HistoricalBigDayTornadoes) +
+  scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
+  labs(x = "Longitude", y = "Latitude", fill = "Density") +
+  ggtitle("Density of Historical Big Day Tornadoes") +
+  theme_bw() +
+  geom_sf(data = centroids, alpha = 0.3) +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
+
+```{r}
+ggplot(HistoricalBigDayTornadoes) +
+  geom_hex(bins=25, aes(x = slon, y = slat)) +
+  geom_sf(data = stateBorders, fill = NA, col = "gray70") +
+  theme_bw()
+```
+
 
 What is the temporal distribution of tornado clusters? Year on the x axis, counts on the y, stacked bars shaded by maximum F rating. Group by 50 years. 
 
@@ -296,6 +304,7 @@ p2 <- ggplot(NumClusbyYear3590, aes(fill = maxEF, y = count, x = Year)) +
   labs(x = "Year", y = "Number of Clusters") +
   theme_minimal()
 
+library(gridExtra)
 grid.arrange(p1, p2)
 ```
 
@@ -440,22 +449,100 @@ ggplot(aes(fill = maxEF, x = maxEF, y = count)) +
   theme_minimal()
 ```
 
-Table: Top ten tornado clusters with the highest fatality counts. 
+Table: Top ten tornado clusters with the highest casualty counts. 
 
 ```{r}
-
+HistoricalBigDays.sfdfT %>%
+  select(cDate, nT, maxEF, GroupDayCas, GroupDayFat) %>%
+  arrange(desc(GroupDayCas)) %>%
+  head(10)
 ```
 
-Figure: Annual # of fatalities from tornadoes with their respective F-scale ratings color coded. 
+Figure: Annual # of casualties from tornadoes with their respective F-scale ratings color coded. 
 
 ```{r}
+test2 <- HistoricalBigDays.sfdfT %>%
+  filter(maxEF == "F2")
+test3 <- HistoricalBigDays.sfdfT %>%
+  filter(maxEF == "F3")
+test4 <- HistoricalBigDays.sfdfT %>%
+  filter(maxEF == "F4")
+test5 <- HistoricalBigDays.sfdfT %>%
+  filter(maxEF == "F5")
 
+test2 <- test2 %>%
+  group_by(Year) %>%
+  summarize(count = sum(GroupDayCas))
+test3 <- test3 %>%
+  group_by(Year) %>%
+  summarize(count = sum(GroupDayCas))
+test4 <- test4 %>%
+  group_by(Year) %>%
+  summarize(count = sum(GroupDayCas))
+test5 <- test5 %>%
+  group_by(Year) %>%
+  summarize(count = sum(GroupDayCas))
+
+test$count[test$count == "NA"] <- 0
+```
+
+```{r}
+F2 <- ggplot(test2, aes(y = count, x = Year)) +
+  geom_bar(fill = "slategray1", position = "stack", stat = "identity") +
+  scale_x_continuous(expand = c(0, 0), limits = c(1875, 1986), breaks = seq(1875, 1986,5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 1000), breaks = seq(0, 6000,100)) +
+  labs(x = "Year", y = "Number of Casualties") +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))+
+  ggtitle("A")
+```
+
+```{r}
+F3 <- ggplot(test3, aes(y = count, x = Year)) +
+  geom_bar(fill = "steelblue2", position = "stack", stat = "identity") +
+  scale_x_continuous(expand = c(0, 0), limits = c(1875, 1986), breaks = seq(1875, 1986,5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 1000), breaks = seq(0, 1000,100)) +
+  labs(x = "Year", y = "Number of Casualties") +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))+
+  ggtitle("B") 
+```
+
+```{r}
+F4 <- ggplot(test4, aes(y = count, x = Year)) +
+  geom_bar(fill = "royalblue3", position = "stack", stat = "identity") +
+  scale_x_continuous(expand = c(0, 0), limits = c(1875, 1986), breaks = seq(1875, 1986,5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 6000), breaks = seq(0, 6000,500)) +
+  labs(x = "Year", y = "Number of Casualties") +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))+
+  ggtitle("C") 
+```
+
+```{r}
+F5 <- ggplot(test5, aes(y = count, x = Year)) +
+  geom_bar(fill = "navyblue", position = "stack", stat = "identity") +
+  scale_x_continuous(expand = c(0, 0), limits = c(1875, 1986), breaks = seq(1875, 1986,5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 6000), breaks = seq(0, 6000,500)) +
+  labs(x = "Year", y = "Number of Casualties") +
+    theme_bw() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) +
+  ggtitle("D") 
+```
+
+```{r}
+grid.arrange(F2, F3, F4, F5)
 ```
 
 Table: Avg # injuries and fatalities per tornado event. Separate by decade and calculate frequency, # fatalities, # of injuries all by rating. 
 
 ```{r}
+omg <- HistoricalBigDays.sfdfT %>%
+  mutate(decade = round(Year/10) * 10) 
+  
 
+omg %>%
+  group_by(decade) %>%
+  summarize(NumClus = n(), 
+            NumTorn = sum(nT),
+            totcas = sum(GroupDayCas, na.rm = TRUE),
+            freq = NumClus/dim(HistoricalBigDays.sfdfT)[1] * 100)
 ```
 
 
