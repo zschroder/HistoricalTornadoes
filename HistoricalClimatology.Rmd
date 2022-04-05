@@ -254,6 +254,8 @@ library(raster)
 ```{r}
 library(ggplot2)
 
+centroids <- st_centroid(HistoricalBigDays.sfdfT)
+
 ggplot(stateBorders) +
   geom_sf(fill = NA, col = "gray70") + 
   stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .7, h = 3, 
