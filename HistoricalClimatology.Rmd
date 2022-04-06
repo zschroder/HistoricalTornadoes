@@ -233,11 +233,11 @@ tm_shape(stateBorders, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 
   tm_layout(            attr.position = c("left", "bottom"), 
             inner.margins = c(.05, .05, .05, .05)) +
 tm_shape(WeakTorns) +
-  tm_bubbles(size = 0.1, col = "blue") +
+  tm_bubbles(size = 0.1, col = "blue", border.col = "blue", alpha = 0.5) +
 tm_shape(StrongTorns) +
-  tm_bubbles(size = 0.1, col = "red") +
+  tm_bubbles(size = 0.1, col = "red", border.col = "red", alpha = 0.5) +
 tm_shape(SignificantTorns) +
-  tm_bubbles(size = 0.1, col = "black") 
+  tm_bubbles(size = 0.1, col = "black", border.col = "black", alpha = 0.5) 
       
 ```
 
@@ -258,19 +258,19 @@ centroids <- st_centroid(HistoricalBigDays.sfdfT)
 
 ggplot(stateBorders) +
   geom_sf(fill = NA, col = "gray70") + 
-  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .7, h = 3, 
+  stat_density2d(aes(x = slon, y = slat, fill = stat(level)), alpha = .4, h = 4, 
                  geom = "polygon", data = HistoricalBigDayTornadoes) +
   scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
   labs(x = "Longitude", y = "Latitude", fill = "Density") +
   ggtitle("Density of Historical Big Day Tornadoes") +
   theme_bw() +
-  geom_sf(data = centroids, alpha = 0.3) +
+  #geom_sf(data = centroids, alpha = 0.4) +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ```{r}
 ggplot(HistoricalBigDayTornadoes) +
-  geom_hex(bins=25, aes(x = slon, y = slat)) +
+  geom_hex(bins=60, aes(x = slon, y = slat)) +
   geom_sf(data = stateBorders, fill = NA, col = "gray70") +
   theme_bw()
 ```
@@ -335,11 +335,12 @@ centroids %>%
 
 ggplot(stateBorders) +
   geom_sf(fill = NA, color = "gray70") + 
-  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5,
+  stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5, h = 5,
                  geom = "polygon", data = HistoricalBigDayTornadoes) +
   facet_wrap(~Ma, ncol = 3) +
-  labs(x = "Longitude", y = "Latitude") +
-  scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
+    scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
+  labs(x = "Longitude", y = "Latitude", fill = "Density") +
+  #scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
   theme_minimal()
 ```
 
@@ -375,7 +376,7 @@ P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("March, April, & May")
+  ggtitle("A")
 ```
 
 ```{r}
@@ -393,7 +394,7 @@ P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("June, July, & August")
+  ggtitle("B")
 
 ```
 
@@ -412,7 +413,7 @@ P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("September, October, & November")
+  ggtitle("C")
 ```
 
 ```{r}
@@ -430,7 +431,7 @@ P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("December, January, & February")
+  ggtitle("D")
 ```
 
 ```{r}
@@ -455,7 +456,7 @@ Table: Top ten tornado clusters with the highest casualty counts.
 
 ```{r}
 HistoricalBigDays.sfdfT %>%
-  select(cDate, nT, maxEF, GroupDayCas, GroupDayFat) %>%
+  dplyr::select(cDate, nT, maxEF, GroupDayCas, GroupDayFat) %>%
   arrange(desc(GroupDayCas)) %>%
   head(10)
 ```
@@ -485,7 +486,7 @@ test5 <- test5 %>%
   group_by(Year) %>%
   summarize(count = sum(GroupDayCas))
 
-test$count[test$count == "NA"] <- 0
+#test$count[test$count == "NA"] <- 0
 ```
 
 ```{r}
