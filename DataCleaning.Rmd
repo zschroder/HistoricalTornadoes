@@ -29,6 +29,7 @@ SigTor_geom <- SigTor$geometry #Save the line geometry for later use.
 Create a new data frame. Convert the time to the appropriate POSIXct format. Create a new column called `LocalTime` in the *SigTor* data. 
 %%Correcting time: 
 ```{r}
+#reformat the time column
 newdat <- SigTor %>%
           mutate(scaledhour = ifelse( time <= 2300, time + 100, time - 2300),
                  hr_plus1 = format(strptime(substr(as.POSIXct(sprintf("%04.0f", scaledhour), format="%H%M"), 12, 16), '%H:%M'), '%H:%M'),
@@ -36,15 +37,16 @@ newdat <- SigTor %>%
                  Time = format(as.POSIXct(hrtime), format = "%H:%M:%S"))
 
 str(newdat)
+#create an object with the correctly formatted time
 LocalTime <- newdat$Time
 
+#Add the correctly formated time to SigTor
 SigTor <- as.data.frame(cbind(SigTor, LocalTime))
 ```
 
 Get the appropriate convective day for each of these reports. A convective day is a 24-hour period extending from 6 AM to 6 AM. Calculate the casualties, path of the damage area, and abbreviation of the month. 
 Separate the date: 
 ```{r}
-
 SigTor <- SigTor %>%
   mutate(local_DateTime = as.POSIXct(paste(Year, Month, Day, LocalTime), format = "%Y%m%d%H"),
          LocalHour = hour(local_DateTime),
@@ -94,7 +96,7 @@ Assign the appropriate timezone to the tornado data using the `tz_lookup` functi
 #install.packages("lutz")
 
 SigTor.sfdf <- SigTor.sfdf %>% 
-  mutate(tz_name = tz_lookup(SigTor.sfdf))
+  mutate(tz_name = tz_lookup(SigTor.sfdf, method = "accurate"))
 
 timezones <- as.data.frame(tz_list())
 US_tz <- as.data.frame(timezones) %>%

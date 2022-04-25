@@ -7,6 +7,10 @@ editor_options:
   chunk_output_type: console
 ---
 
+Journal of Weather and Climate Extremes
+
+The goal of this research is to understand when and where tornado outbreaks occurred prior to the modern record maintained by the Storm Prediction Center. Has the number of outbreaks increased over time? When do they occur most frequently? Where do they occur most frequently? How does our current outbreak climatology compare to the historical record? 
+
 Library the datasets used in this project: 
 ```{r}
 suppressMessages(library(ggplot2))
@@ -94,17 +98,19 @@ proc.time() - stime
 SigTorns$groupNumber <- groupNumber
 ```
 
-Compute group-level statistics. 
-```{r, eval = FALSE}
-HistoricalGroups.sfdfT <- SigTorns %>%
+```{r}
+test <- SigTorns %>%
+  filter(groupNumber == 49)
+
+ugh <- test %>%
   group_by(groupNumber) %>%
   summarize(Year = first(Year),
             Month = first(Month),
-            FirstDate = first(DateTime),
-            LastDate = last(DateTime),
+            FirstDate = min(DateTime),
+            LastDate = max(date),
             DateRange = paste(FirstDate, "to", LastDate),
-            FirstcDate = first(cDate),
-            LastcDate = last(cDate),
+            FirstcDate = min(cDate),
+            LastcDate = max(cDate),
             ncD = n_distinct(cDate),
             nT = n(),
             n0 = sum(mag == "F0"),
@@ -117,8 +123,38 @@ HistoricalGroups.sfdfT <- SigTorns %>%
             ATP_TW = paste(round(ATP/10^12), "TW"),
             maxEF = max(mag),
             nD = n_distinct(date),
-            StartTime = first(Time_CST),
-            EndTime = last(Time_CST),
+            StartTime = min(Time_CST),
+            EndTime = max(Time_CST),
+            Duration = difftime(EndTime, StartTime, units = "secs"), 
+            cas = sum(inj + fat))
+```
+
+
+Compute group-level statistics. 
+```{r, eval = FALSE}
+HistoricalGroups.sfdfT <- SigTorns %>%
+  group_by(groupNumber) %>%
+  summarize(Year = first(Year),
+            Month = first(Month),
+            FirstDate = min(DateTime),
+            LastDate = max(date),
+            DateRange = paste(FirstDate, "to", LastDate),
+            FirstcDate = min(cDate),
+            LastcDate = max(cDate),
+            ncD = n_distinct(cDate),
+            nT = n(),
+            n0 = sum(mag == "F0"),
+            n1 = sum(mag == "F1"),
+            n2 = sum(mag == "F2"),
+            n3 = sum(mag == "F3"),
+            n4 = sum(mag == "F4"),
+            n5 = sum(mag == "F5"),
+            ATP = sum(ED),
+            ATP_TW = paste(round(ATP/10^12), "TW"),
+            maxEF = max(mag),
+            nD = n_distinct(date),
+            StartTime = min(Time_CST),
+            EndTime = max(Time_CST),
             Duration = difftime(EndTime, StartTime, units = "secs"), 
             cas = sum(inj + fat)) 
 ```
@@ -137,8 +173,7 @@ Filter individual tornadoes to remove those that are not part of a large group. 
 HistoricalBigDays.sfdfT <- SigTorns %>%
   filter(groupNumber %in% HistoricalGroups.sfdfT$groupNumber) %>%
   group_by(groupNumber, cDate) %>%
-  summarize(Hour = first(Hour), 
-            nT = n(),
+  summarize(nT = n(),
             n0 = sum(mag == "F0"),
             n1 = sum(mag == "F1"),
             n2 = sum(mag == "F2"),
@@ -151,8 +186,9 @@ HistoricalBigDays.sfdfT <- SigTorns %>%
             avgATP = mean(ED),
             GroupDayCas = sum(cas),
             GroupDayFat = sum(fat),
-            StartTime_CST = first(Time_CST),
-            EndTime_CST= last(Time_CST),
+            StartTime_CST = min(Time_CST),
+            EndTime_CST= max(Time_CST),
+            Hour = hour(StartTime_CST),
             StartTime_UTC = StartTime_CST + 21600,
             EndTime_UTC = EndTime_CST + 21600,
             Duration = difftime(EndTime_CST, StartTime_CST, units = "secs")) %>%
@@ -164,7 +200,7 @@ HistoricalBigDays.sfdfT <- SigTorns %>%
          ATP_TW = ATP/10^12)                                                                              
 dim(HistoricalBigDays.sfdfT)
 ```
-This follows Trapps paper that defines an outbreak as 6+ torns rated EF2 or higher. 
+This follows Tippetts paper that defines an outbreak as 6+ torns rated EF1 or higher. 
 
 
 ```{r, eval = FALSE}
@@ -241,6 +277,78 @@ tm_shape(SignificantTorns) +
       
 ```
 
+March 27, 1882
+ID: 
+```{r}
+Mar27 <- HistoricalBigDays.sfdfT %>%
+  filter(cDate == "1882-03-27", groupNumber == 4)
+Mar27 <- st_convex_hull(Mar27)
+
+Mar27centroid <- centroids %>%
+  filter(cDate == "1882-03-27", groupNumber == 4)
+
+Mar27tornadoes <- HistoricalBigDayTornadoes %>% 
+  filter(cDate == "1882-03-27", groupNumber == 4)
+
+Mar27tornadoes <- Mar27tornadoes %>%
+  mutate(Hour2 = ifelse(Hour <= 6, Hour + 24, Hour))
+```
+
+**Make a map of the May 20 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
+```{r}
+Mar27tornadoes$Hour2 <- cut(Mar27tornadoes$Hour2, breaks=c(6,12,18,24,30))
+
+Mar1882 <- (tm_shape(stateBorders) + 
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.3, .15, .3, .15)) +
+#tm_shape(counties.sf) +
+#  tm_borders(col = "gray40", alpha = .3) +
+#  tm_scale_bar(width = 8, size = 8, color.dark = "gray70") +
+  #tm_format("World", legend.position = c("right", "top"),
+#                   attr.position = c("right", "top"),
+#                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+ #                  inner.margins = c(.2, .2, .2, .2)) +
+tm_shape(Mar27, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "black", lwd = 3) +
+tm_shape(Mar27tornadoes) +
+  tm_symbols(size = 4, col = "Hour2", alpha = 0.8, palette = "BuPu", title.col = "Time [CST]", labels = c("6 to 12", "12 to 18", "18 to 24", "0 to 6"), border.alpha = 0) +
+    tm_layout(legend.title.size = 1.1,
+            legend.position = c("right", "bottom"), 
+            legend.stack = "horizontal",
+            legend.frame = FALSE, 
+            legend.text.size = 1, legend.width = -0.2) +
+tm_shape(Mar27centroid) +
+  tm_symbols(size = 1.25, col = "black", shape = 24)  +
+  tm_layout(title = "March 27, 1882 \n 14 tornadoes", 
+              title.position = c("center", "top"), 
+              legend.title.size = 1.4,
+              legend.position = c("right", "bottom"), 
+              legend.stack = "horizontal",
+              legend.frame = FALSE, 
+              legend.text.size = 1.2, 
+              legend.width = -0.2, 
+              title.size = 1.5)
+)
+
+Mar1882
+```
+
+
+```{r}
+HistoricalBigDays.sfdfT %>%
+  dplyr::select(cDate, nT, maxEF, GroupDayCas, st) %>%
+  arrange(desc(nT)) %>%
+  head(10)
+```
+
 Create a figure of the tornado cluster density plot for all of the tornadoes (A) and only the strongest tornadoes (B). 
 
 Kernel Density: 
@@ -249,7 +357,6 @@ Kernel Density:
 library(maptools)
 library(raster)
 ```
-
 
 ```{r}
 library(ggplot2)
@@ -545,8 +652,71 @@ omg %>%
   summarize(NumClus = n(), 
             NumTorn = sum(nT),
             totcas = sum(GroupDayCas, na.rm = TRUE),
-            freq = NumClus/dim(HistoricalBigDays.sfdfT)[1] * 100)
+            freq = NumClus/dim(HistoricalBigDays.sfdfT)[1] * 100, 
+            tot = NumTorn/NumClus)
 ```
 
+April 3, 1974
+ID: 
+```{r}
+Apr3 <- HistoricalBigDays.sfdfT %>%
+  filter(cDate == "1974-04-03", groupNumber == 286)
+Apr3 <- st_convex_hull(Apr3)
 
+Apr3centroid <- centroids %>%
+  filter(cDate == "1974-04-03", groupNumber == 286)
+
+Apr3tornadoes <- HistoricalBigDayTornadoes %>% 
+  filter(cDate == "1974-04-03", groupNumber == 286)
+
+Apr3tornadoes <- Apr3tornadoes %>%
+  mutate(Hour2 = ifelse(Hour <= 6, Hour + 24, Hour))
+```
+
+**Make a map of the May 20 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
+```{r}
+Apr3tornadoes$Hour2 <- cut(Apr3tornadoes$Hour2, breaks=c(6,12,18,24,30))
+
+Apr31974 <- (tm_shape(stateBorders) + 
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.15, .15, .15, .15)) +
+#tm_shape(counties.sf) +
+#  tm_borders(col = "gray40", alpha = .3) +
+#  tm_scale_bar(width = 8, size = 8, color.dark = "gray70") +
+  #tm_format("World", legend.position = c("right", "top"),
+#                   attr.position = c("right", "top"),
+#                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+ #                  inner.margins = c(.2, .2, .2, .2)) +
+tm_shape(Apr3, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "black", lwd = 3) +
+tm_shape(Apr3tornadoes) +
+  tm_symbols(size = 4, col = "Hour2", alpha = 0.8, palette = "BuPu", title.col = "Time [CST]", labels = c("6 to 12", "12 to 18", "18 to 24", "0 to 6"), border.alpha = 0) +
+    tm_layout(legend.title.size = 1.1,
+            legend.position = c("right", "bottom"), 
+            legend.stack = "horizontal",
+            legend.frame = FALSE, 
+            legend.text.size = 1, legend.width = -0.2) +
+tm_shape(Apr3centroid) +
+  tm_symbols(size = 1.25, col = "black", shape = 24)  +
+  tm_layout(title = "April 3, 1974 \n 94 tornadoes", 
+              title.position = c("center", "top"), 
+              legend.title.size = 1.4,
+              legend.position = c("right", "bottom"), 
+              legend.stack = "horizontal",
+              legend.frame = FALSE, 
+              legend.text.size = 1.2, 
+              legend.width = -0.2, 
+              title.size = 1.5)
+)
+
+Apr31974
+```
 
