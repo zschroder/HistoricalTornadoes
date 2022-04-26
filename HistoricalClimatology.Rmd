@@ -98,7 +98,7 @@ proc.time() - stime
 SigTorns$groupNumber <- groupNumber
 ```
 
-```{r}
+```{r, eval = FALSE}
 test <- SigTorns %>%
   filter(groupNumber == 49)
 
@@ -280,6 +280,9 @@ tm_shape(SignificantTorns) +
 March 27, 1882
 ID: 
 ```{r}
+centroids <- st_centroid(HistoricalBigDays.sfdfT)
+
+
 Mar27 <- HistoricalBigDays.sfdfT %>%
   filter(cDate == "1882-03-27", groupNumber == 4)
 Mar27 <- st_convex_hull(Mar27)
@@ -344,7 +347,7 @@ Mar1882
 
 ```{r}
 HistoricalBigDays.sfdfT %>%
-  dplyr::select(cDate, nT, maxEF, GroupDayCas, st) %>%
+  dplyr::select(cDate, nT, maxEF, GroupDayCas) %>%
   arrange(desc(nT)) %>%
   head(10)
 ```
@@ -360,8 +363,6 @@ library(raster)
 
 ```{r}
 library(ggplot2)
-
-centroids <- st_centroid(HistoricalBigDays.sfdfT)
 
 ggplot(stateBorders) +
   geom_sf(fill = NA, col = "gray70") + 
