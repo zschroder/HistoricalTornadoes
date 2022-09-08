@@ -27,6 +27,9 @@ SigTor_geom <- SigTor$geometry #Save the line geometry for later use.
 ```
 
 Create a new data frame. Convert the time to the appropriate POSIXct format. Create a new column called `LocalTime` in the *SigTor* data. 
+
+**Currently, the data is a numeric value (i.e., 2300). It needs to be converted to a time object (i.e., 23:00:00). First, create a scaled hour to elliviate negative values for 0 hours. Do this by adding 1 hour to the time column for values less than or equal to 2300. Then, convert to the %H:%M:%S time. Now remove that extra hour (-3600 seconds). Then create a TIME column of formatted time of the tornado occurrence.** 
+
 %%Correcting time: 
 ```{r}
 #reformat the time column
@@ -50,8 +53,8 @@ Separate the date:
 SigTor <- SigTor %>%
   mutate(local_DateTime = as.POSIXct(paste(Year, Month, Day, LocalTime), format = "%Y%m%d%H"),
          LocalHour = hour(local_DateTime),
-         cDateTime = local_DateTime - as.difftime(6, unit = "hours"),
-         cDate = as.Date(as_datetime(ifelse(LocalHour < 6, (local_DateTime - 86400), cDateTime), tz = Sys.timezone())),
+         #cDateTime = local_DateTime - as.difftime(6, unit = "hours"),
+         #cDate = as.Date(as_datetime(ifelse(LocalHour < 6, (local_DateTime - 86400), cDateTime), tz = Sys.timezone())),
          cas = inj + fat,
          AreaPath = len * wid,
          Ma = factor(month.abb[Month], levels = month.abb[1:12])) %>%
@@ -155,6 +158,15 @@ Standardize all times to CST to remain consistent with the current SPC dataset.
 ```{r}
 SigTor.sfdf <- SigTor.sfdf %>%
   mutate(Time_CST = Zulu_DateTime - 3600 * 6)
+```
+
+ Calculate the Convective day!:
+```{r}
+SigTor <- SigTor.sfdf %>%
+  mutate(cDateTime = Time_CST - as.difftime(6, unit = "hours"),
+         hour_CST = hour(Time_CST),
+         cDate = as.Date(as_datetime(ifelse(hour_CST < 6, (Time_CST - 86400), cDateTime), tz = Sys.timezone()))) %>%
+  sf::st_sf()
 ```
 
 Calculate the NARRtime, NARRday, and NARRZtime for each report. 
