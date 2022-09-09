@@ -27,8 +27,8 @@ load("HistoricalTornadoes.RData")
 ```
 
 ```{r, eval = FALSE}
-SigTorns["mag"][SigTorns["mag"] == "FN"] <- "F00"
-SigTorns["mag"][SigTorns["mag"] == "FT"] <- "F00"
+SigTorns$mag[SigTorns$mag == "FN"]  <- "F00" 
+SigTorns$mag[SigTorns$mag == "FT"]  <- "F00" 
 ```
 
 Get the state data for the lower 48 using the `us_states` function from the **USAboundaries** package. This will allow the state borders to be added to a map using the *tm_shape* function. 
@@ -66,7 +66,7 @@ st_crs(SigTorns) <- 4326
 SigTorns <- st_transform(SigTorns, crs = 4326)
 
 space <- st_coordinates(SigTorns)
-time <- as.numeric(SigTorns$Time_CST)
+time <- as.numeric(SigTorns$DateTime)
 
 space[is.na(space)] <- 0
 time[is.na(time)] <- 0
@@ -98,44 +98,12 @@ proc.time() - stime
 SigTorns$groupNumber <- groupNumber
 ```
 
-```{r, eval = FALSE}
-test <- SigTorns %>%
-  filter(groupNumber == 49)
-
-ugh <- test %>%
-  group_by(groupNumber) %>%
-  summarize(Year = first(Year),
-            Month = first(Month),
-            FirstDate = min(DateTime),
-            LastDate = max(date),
-            DateRange = paste(FirstDate, "to", LastDate),
-            FirstcDate = min(cDate),
-            LastcDate = max(cDate),
-            ncD = n_distinct(cDate),
-            nT = n(),
-            n0 = sum(mag == "F0"),
-            n1 = sum(mag == "F1"),
-            n2 = sum(mag == "F2"),
-            n3 = sum(mag == "F3"),
-            n4 = sum(mag == "F4"),
-            n5 = sum(mag == "F5"),
-            ATP = sum(ED),
-            ATP_TW = paste(round(ATP/10^12), "TW"),
-            maxEF = max(mag),
-            nD = n_distinct(date),
-            StartTime = min(Time_CST),
-            EndTime = max(Time_CST),
-            Duration = difftime(EndTime, StartTime, units = "secs"), 
-            cas = sum(inj + fat))
-```
-
-
-Compute group-level statistics. 
+Compute group-level statistics.
 ```{r, eval = FALSE}
 HistoricalGroups.sfdfT <- SigTorns %>%
   group_by(groupNumber) %>%
-  summarize(Year = first(Year),
-            Month = first(Month),
+  summarize(Year = first(yr),
+            Month = first(mo),
             FirstDate = min(DateTime),
             LastDate = max(date),
             DateRange = paste(FirstDate, "to", LastDate),
@@ -153,10 +121,10 @@ HistoricalGroups.sfdfT <- SigTorns %>%
             ATP_TW = paste(round(ATP/10^12), "TW"),
             maxEF = max(mag),
             nD = n_distinct(date),
-            StartTime = min(Time_CST),
-            EndTime = max(Time_CST),
+            StartTime = min(DateTime),
+            EndTime = max(DateTime),
             Duration = difftime(EndTime, StartTime, units = "secs"), 
-            cas = sum(inj + fat)) 
+            cas = sum(inj + fat))
 ```
 
 ```{r, eval = FALSE}
@@ -186,12 +154,12 @@ HistoricalBigDays.sfdfT <- SigTorns %>%
             avgATP = mean(ED),
             GroupDayCas = sum(cas),
             GroupDayFat = sum(fat),
-            StartTime_CST = min(Time_CST),
-            EndTime_CST= max(Time_CST),
-            Hour = hour(StartTime_CST),
-            StartTime_UTC = StartTime_CST + 21600,
-            EndTime_UTC = EndTime_CST + 21600,
-            Duration = difftime(EndTime_CST, StartTime_CST, units = "secs")) %>%
+            StartTime = min(DateTime),
+            EndTime= max(DateTime),
+            Hour = hour(StartTime),
+            StartTime_UTC = StartTime + 21600,
+            EndTime_UTC = EndTime + 21600,
+            Duration = difftime(EndTime, StartTime, units = "secs")) %>%
   filter(nT >= 6) %>%
   mutate(Year = year(cDate),
          Mo = month(cDate),
@@ -234,6 +202,17 @@ Load in the Cluster Data of the Historical Tornado Data
 ```{r}
 load("HistoricalClusters.RData")
 ```
+
+```{r}
+g49 <- HistoricalBigDays.sfdfT %>%
+  filter(groupNumber == 49)
+
+g49torns <- HistoricalBigDayTornadoes %>%
+  filter(groupNumber == 49)
+
+```
+
+
 
 December 3, 1978: Get the magnitude from the SPC dataset. It is an F3. 
 
@@ -294,7 +273,7 @@ Mar27tornadoes <- HistoricalBigDayTornadoes %>%
   filter(cDate == "1882-03-27", groupNumber == 4)
 
 Mar27tornadoes <- Mar27tornadoes %>%
-  mutate(Hour2 = ifelse(Hour <= 6, Hour + 24, Hour))
+  mutate(Hour2 = ifelse(hour <= 6, hour + 24, hour))
 ```
 
 **Make a map of the May 20 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
@@ -323,14 +302,7 @@ tm_shape(Mar27, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 
   tm_borders(col = "black", lwd = 3) +
 tm_shape(Mar27tornadoes) +
   tm_symbols(size = 4, col = "Hour2", alpha = 0.8, palette = "BuPu", title.col = "Time [CST]", labels = c("6 to 12", "12 to 18", "18 to 24", "0 to 6"), border.alpha = 0) +
-    tm_layout(legend.title.size = 1.1,
-            legend.position = c("right", "bottom"), 
-            legend.stack = "horizontal",
-            legend.frame = FALSE, 
-            legend.text.size = 1, legend.width = -0.2) +
-tm_shape(Mar27centroid) +
-  tm_symbols(size = 1.25, col = "black", shape = 24)  +
-  tm_layout(title = "March 27, 1882 \n 14 tornadoes", 
+      tm_layout(title = "March 27, 1882 \n 14 tornadoes", 
               title.position = c("center", "top"), 
               legend.title.size = 1.4,
               legend.position = c("right", "bottom"), 
