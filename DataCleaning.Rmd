@@ -18,7 +18,10 @@ suppressMessages(library(chron))
 
 Load the original Significant Tornado data into this session. 
 ```{r}
-SigTor <- st_read("C:/Users/SCHRODEZ/Desktop/Research_Projects/HistoricalTornadoes/SignificantTornadoesData/SignificantTornadoes.shp")
+SigTor <- st_read("E:/Zoe/Projects/HistoricalTornadoes/SignificantTornadoesData/1880-1990-torn-aspath.shp")
+```
+
+```{r}
 str(SigTor)
 
 #save(SigTor, file = "OriginalTornadoData.RData")
@@ -26,42 +29,16 @@ str(SigTor)
 SigTor_geom <- SigTor$geometry #Save the line geometry for later use.
 ```
 
-Create a new data frame. Convert the time to the appropriate POSIXct format. Create a new column called `LocalTime` in the *SigTor* data. 
-
-**Currently, the data is a numeric value (i.e., 2300). It needs to be converted to a time object (i.e., 23:00:00). First, create a scaled hour to elliviate negative values for 0 hours. Do this by adding 1 hour to the time column for values less than or equal to 2300. Then, convert to the %H:%M:%S time. Now remove that extra hour (-3600 seconds). Then create a TIME column of formatted time of the tornado occurrence.** 
-
-%%Correcting time: 
-```{r}
-#reformat the time column
-newdat <- SigTor %>%
-          mutate(scaledhour = ifelse( time <= 2300, time + 100, time - 2300),
-                 hr_plus1 = format(strptime(substr(as.POSIXct(sprintf("%04.0f", scaledhour), format="%H%M"), 12, 16), '%H:%M'), '%H:%M'),
-                hrtime = strptime(hr_plus1, format="%H:%M") - 3600,
-                 Time = format(as.POSIXct(hrtime), format = "%H:%M:%S"))
-
-str(newdat)
-#create an object with the correctly formatted time
-LocalTime <- newdat$Time
-
-#Add the correctly formated time to SigTor
-SigTor <- as.data.frame(cbind(SigTor, LocalTime))
-```
-
 Get the appropriate convective day for each of these reports. A convective day is a 24-hour period extending from 6 AM to 6 AM. Calculate the casualties, path of the damage area, and abbreviation of the month. 
 Separate the date: 
 ```{r}
 SigTor <- SigTor %>%
-  mutate(local_DateTime = as.POSIXct(paste(Year, Month, Day, LocalTime), format = "%Y%m%d%H"),
-         LocalHour = hour(local_DateTime),
-         #cDateTime = local_DateTime - as.difftime(6, unit = "hours"),
-         #cDate = as.Date(as_datetime(ifelse(LocalHour < 6, (local_DateTime - 86400), cDateTime), tz = Sys.timezone())),
+  mutate(DateTime = as.POSIXct(paste(date, time), format="%Y-%m-%d %H:%M:%S"), 
          cas = inj + fat,
          AreaPath = len * wid,
-         Ma = factor(month.abb[Month], levels = month.abb[1:12])) %>%
+         Ma = factor(month.abb[mo], levels = month.abb[1:12])) %>%
   sf::st_sf()
 dim(SigTor)[1]
-
-SigTor <- rename(SigTor, time24hr = time)
 ```
 Compute the Energy Dissipation (ED) where $A_p$ is the area of the path, $\rho$ is area density [1 kg/m^3]  $v_j$ is the midpoint wind speed for each rating, and $w_j$ is the corresponding fraction of path area by EF rating. With no upper bound on the EF5 wind speeds, the midpoint wind speed is set at 97 m~s$^{-1}$ (7.5 m~s$^{-1}$ above the threshold wind speed consistent with the EF4 midpoint speed relative to its threshold)
 ```{r}
@@ -94,85 +71,21 @@ slon = SigTor$slon
 SigTor.sfdf <- cbind(SigTor.sfdf, slat, slon)
 ```
 
-Assign the appropriate timezone to the tornado data using the `tz_lookup` function from the **lutz** package. 
-```{r}
-#install.packages("lutz")
-
-SigTor.sfdf <- SigTor.sfdf %>% 
-  mutate(tz_name = tz_lookup(SigTor.sfdf, method = "accurate"))
-
-timezones <- as.data.frame(tz_list())
-US_tz <- as.data.frame(timezones) %>%
-  filter(tz_name %in% SigTor.sfdf$tz_name) 
-```
-
-Determine whether the DateTime is experiencing standard time or daylight time. Use the `dst` function from the **lubridate** package. 
-```{r}
-library(lubridate)
-
-SigTor.sfdf <- SigTor.sfdf %>%
-  mutate(dst = dst(date))
-```
-
-Compute the GMT time for each tornado report using the correct conversion and appropriate timezone. 
-```{r}
-timezone = c()
-Zulu_DateTime = c()
-
-heyya <- for (i in 1:dim(SigTor.sfdf)[1]) {
-  tz = (SigTor.sfdf$tz_name[i]) #tz_name column in #28 
-    bonjour <- US_tz %>%
-      filter(tz_name == tz) 
-    bonjour <-  as.data.frame(bonjour)
-    
-    TZAbbr <- if(SigTor.sfdf$dst[i] == TRUE) {
-       bonjour[2,2]
-      } else if (SigTor.sfdf$dst[i] == FALSE){
-        bonjour[1,2] 
-        }  else { 
-            NA
-        }
-    timezone <- append(timezone, TZAbbr)
-    
-    ZuluTime <- if (SigTor.sfdf$dst[i] == TRUE){
-      (SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[2,4])) 
-      } else if (SigTor.sfdf$dst[i] == FALSE) {
-      (SigTor.sfdf$local_DateTime[i] - (3600 * bonjour[1,4]))
-      } else {
-      NA
-    }
-     ZuluTime2 <- strftime(ZuluTime, '%Y-%m-%d %H:%M:%S')
-     Zulu_DateTime <- append(Zulu_DateTime, ZuluTime2)
-}
-
-SigTor.sfdf <- cbind(SigTor.sfdf, as.data.frame(timezone), as.data.frame(Zulu_DateTime))
-```
-
-
-Convert Zulu_DateTime to a POSIXct object. 
-```{r}
-SigTor.sfdf$Zulu_DateTime <- as.POSIXct(SigTor.sfdf$Zulu_DateTime, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-```
-
-Standardize all times to CST to remain consistent with the current SPC dataset. 
+Calculate the Convective day!:
 ```{r}
 SigTor.sfdf <- SigTor.sfdf %>%
-  mutate(Time_CST = Zulu_DateTime - 3600 * 6)
-```
-
- Calculate the Convective day!:
-```{r}
-SigTor <- SigTor.sfdf %>%
-  mutate(cDateTime = Time_CST - as.difftime(6, unit = "hours"),
-         hour_CST = hour(Time_CST),
-         cDate = as.Date(as_datetime(ifelse(hour_CST < 6, (Time_CST - 86400), cDateTime), tz = Sys.timezone()))) %>%
+  mutate(cDateTime = DateTime - as.difftime(6, unit = "hours"),
+         hour = hour(DateTime),
+         cDate = as.Date(as_datetime(ifelse(hour < 6, (DateTime - 86400), cDateTime), tz = Sys.timezone()))) %>%
   sf::st_sf()
 ```
 
+
+
 Calculate the NARRtime, NARRday, and NARRZtime for each report. 
 ```{r}
-SigTor.sfdf$Zulu_DateTime <- force_tz(SigTor.sfdf$Zulu_DateTime, tzone = "UTC")
-NARRtime <- align.time(SigTor.sfdf$Zulu_DateTime, n = (60 * 60 * 3)) - 3600 * 3 ###Had to remove the -3600*3
+SigTor.sfdf$Zulu_DateTime <- force_tz(SigTor.sfdf$DateTime, tzone = "UTC")
+NARRtime <- align.time(SigTor.sfdf$Zulu_DateTime, n = (60 * 60 * 3)) + 3600 *3 ###Had to remove the -3600*3
 NARRday = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y/%m/%d")
 NARRZtime = format(as.POSIXct(strptime(NARRtime,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H")
 
@@ -182,43 +95,8 @@ SigTor.sfdf <- cbind(SigTor.sfdf, NARRday, NARRZtime)
 Establish the geometry for a tornado tracks dataset using the original geometry from the Historical Tornadoes data. 
 ```{r}
 #Tornado Tracks
-SigTorTracks.sfdf <- st_as_sf(cbind(st_drop_geometry(SigTor.sfdf), SigTor_geom))
-```
-
-Rearrange the data. Create a tornado touchdown (point) dataset. 
-```{r}
-geom_points <- SigTor.sfdf$geometry
-
-SigTor.sfdf = st_drop_geometry(SigTor.sfdf)
-
-
-Ma <- SigTor.sfdf$Ma
-Time_CST <- SigTor.sfdf$Time_CST
-AreaPath <- SigTor.sfdf$AreaPath
-ED <- SigTor.sfdf$ED
-cas <-  SigTor.sfdf$cas
-cDate <- SigTor.sfdf$cDate
-Zulu_DateTime <-  SigTor.sfdf$Zulu_DateTime
-county <- SigTor.sfdf$county
-
-SigTorns <- cbind(SigTor.sfdf[,1:3],  SigTor.sfdf[,11:13], Ma, SigTor.sfdf[,17:19], Time_CST, county, SigTor.sfdf[,5:9], AreaPath, ED, cas, SigTor.sfdf[,28:29], SigTor.sfdf[,14:15], cDate, Zulu_DateTime, SigTor.sfdf[,30:32], SigTorTracks.sfdf[,35:36], geom_points )
-```
-
-Create a tornado tracks dataset. 
-```{r}
-geom_tracks <- SigTorTracks.sfdf$geometry
-SigTorTracks.sfdf = st_drop_geometry(SigTorTracks.sfdf)
-
-Ma <- SigTorTracks.sfdf$Ma
-Time_CST <- SigTorTracks.sfdf$Time_CST
-AreaPath <- SigTorTracks.sfdf$AreaPath
-ED <- SigTorTracks.sfdf$ED
-cas <-  SigTorTracks.sfdf$cas
-cDate <- SigTorTracks.sfdf$cDate
-Zulu_DateTime <-  SigTorTracks.sfdf$Zulu_DateTime
-county <- SigTorTracks.sfdf$county
-
-SigTornTracks <- cbind(SigTorTracks.sfdf[,1:3],  SigTorTracks.sfdf[,11:13], Ma, SigTorTracks.sfdf[,17:19], Time_CST, county, SigTorTracks.sfdf[,5:9], AreaPath, ED, cas, SigTorTracks.sfdf[,28:29], SigTorTracks.sfdf[,14:15], cDate, Zulu_DateTime, SigTorTracks.sfdf[,30:32], SigTorTracks.sfdf[,35:36], geom_tracks)
+SigTornTracks<- st_as_sf(cbind(st_drop_geometry(SigTor.sfdf), SigTor_geom))
+SigTorns <- SigTor.sfdf
 ```
 
 ```{r}
