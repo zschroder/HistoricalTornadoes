@@ -20,6 +20,8 @@ suppressMessages(library(dplyr))
 suppressMessages(library(USAboundaries))
 suppressMessages(library(lubridate))
 ```
+*****************************************************************************
+## Establish Groups and Big Days of at least 6 tornadoes. 
 
 Load the data for the Historical Tornado Dataset. This will include the tornado touchdown locations (`SigTorns`) and the tracks of the tornadoes (`SigTornTracks`). For this research, use the `SigTorns` dataframe. 
 ```{r, eval = FALSE}
@@ -152,8 +154,8 @@ HistoricalBigDays.sfdfT <- SigTorns %>%
             ATP = sum(ED),
             maxATP = max(ED),
             avgATP = mean(ED),
-            GroupDayCas = sum(cas),
-            GroupDayFat = sum(fat),
+            GroupDayCas = sum(cas, na.rm = TRUE),
+            GroupDayFat = sum(fat, na.rm = TRUE),
             StartTime = min(DateTime),
             EndTime= max(DateTime),
             Hour = hour(StartTime),
@@ -198,6 +200,8 @@ Save the Cluster Data into an .RData object.
 #save(HistoricalBigDays.sfdfT, HistoricalBigDayTornadoes, HistoricalGroups.sfdfT, HistoricalGroupTornadoes, file = "HistoricalClusters.RData")
 ```
 
+*****************************************************************************
+
 Load in the Cluster Data of the Historical Tornado Data
 ```{r}
 load("HistoricalClusters.RData")
@@ -205,10 +209,10 @@ load("HistoricalClusters.RData")
 
 ```{r}
 g49 <- HistoricalBigDays.sfdfT %>%
-  filter(groupNumber == 49)
+  filter(ID == 1908042349)
 
 g49torns <- HistoricalBigDayTornadoes %>%
-  filter(groupNumber == 49)
+  filter(ID == 1908042349)
 
 ```
 
