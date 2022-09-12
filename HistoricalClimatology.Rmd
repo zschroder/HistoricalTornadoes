@@ -13,13 +13,17 @@ The goal of this research is to understand when and where tornado outbreaks occu
 
 Library the datasets used in this project: 
 ```{r}
+extrafont::loadfonts(device="win")
 suppressMessages(library(ggplot2))
 suppressMessages(library(tmap))
 suppressMessages(library(sf))
 suppressMessages(library(dplyr))
 suppressMessages(library(USAboundaries))
 suppressMessages(library(lubridate))
+suppressMessages(library(maptools))
+suppressMessages(library(raster))
 ```
+
 *****************************************************************************
 ## Establish Groups and Big Days of at least 6 tornadoes. 
 
@@ -207,6 +211,7 @@ Load in the Cluster Data of the Historical Tornado Data
 load("HistoricalClusters.RData")
 ```
 
+Conduct some data verification. Make sure the calculations are correct between the reported tornadoes and the cluster information.
 ```{r}
 g49 <- HistoricalBigDays.sfdfT %>%
   filter(ID == 1908042349)
@@ -215,8 +220,6 @@ g49torns <- HistoricalBigDayTornadoes %>%
   filter(ID == 1908042349)
 
 ```
-
-
 
 December 3, 1978: Get the magnitude from the SPC dataset. It is an F3. 
 
@@ -232,32 +235,17 @@ HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F0"] <- "F2"
 HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F00"] <- "F3"
 ```
 
-Separate the data between Weak, Strong, and Significant Tornadoes. 
+## Create Figure of Historical Groups: Example of clusters within the data. (A) The largest cluster in the data occurred between XX and XX. (B) The longest cluster in the data occurred between XX and XX. Each circle is a tornado genesis location colored by the day of occurrence. The black line is the minimum convex polygon surrounding all the genesis locations (convex hull)
+
 ```{r}
-WeakTorns <- (HistoricalBigDayTornadoes) %>%
-  filter(mag == "F1")
-StrongTorns <- HistoricalBigDayTornadoes %>%
-  filter(mag == "F2" | mag == "F3")
-SignificantTorns <- HistoricalBigDayTornadoes %>%
-  filter(mag == "F4" | mag == "F5")
+
 ```
 
 
-Plot the data for the tornado touchdown locations (`SigTorns`). Add a map of the United States. Color code the tornadoes by ORANGE: weak (F0, F1), RED: strong(F2, F3), BLACK: significant (F4, F5). 
+## Create Table: The total number of large groups and tornadoes by duration.
+
 ```{r}
-tm_shape(stateBorders, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
-  tm_borders(col = "gray70", alpha = 1) +
-  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
-  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
-  tm_layout(            attr.position = c("left", "bottom"), 
-            inner.margins = c(.05, .05, .05, .05)) +
-tm_shape(WeakTorns) +
-  tm_bubbles(size = 0.1, col = "blue", border.col = "blue", alpha = 0.5) +
-tm_shape(StrongTorns) +
-  tm_bubbles(size = 0.1, col = "red", border.col = "red", alpha = 0.5) +
-tm_shape(SignificantTorns) +
-  tm_bubbles(size = 0.1, col = "black", border.col = "black", alpha = 0.5) 
-      
+
 ```
 
 March 27, 1882
@@ -280,7 +268,7 @@ Mar27tornadoes <- Mar27tornadoes %>%
   mutate(Hour2 = ifelse(hour <= 6, hour + 24, hour))
 ```
 
-**Make a map of the May 20 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
+**Make a map of the March 27 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. Plot as an example of a historical cluster.**
 ```{r}
 Mar27tornadoes$Hour2 <- cut(Mar27tornadoes$Hour2, breaks=c(6,12,18,24,30))
 
@@ -321,77 +309,141 @@ Mar1882
 ```
 
 
+**Create a table of the Top 10 clusters based on the number of tornadoes that occurred. Obtain the maximum EF rating and total casualties for those days. **
 ```{r}
-HistoricalBigDays.sfdfT %>%
+x <- HistoricalBigDays.sfdfT %>%
   dplyr::select(cDate, nT, maxEF, GroupDayCas) %>%
   arrange(desc(nT)) %>%
   head(10)
+
+x<- st_drop_geometry(x)
+
+print(xtable(x))
 ```
+
+## Create Figure: Multiple clusters on a single convective day
+```{r}
+
+```
+
+
+
+Separate the data between Weak, Strong, and Significant Tornadoes. 
+```{r}
+centroids <- st_centroid(HistoricalBigDays.sfdfT)
+centroids.spatpoint <- as_Spatial(centroids)
+WeakTorns <- (centroids) %>%
+  filter(maxEF == "F1")
+StrongTorns <- centroids %>%
+  filter(maxEF == "F2" | maxEF == "F3") %>%
+  as_Spatial()
+SignificantTorns <- centroids %>%
+  filter(maxEF == "F4" | maxEF == "F5") %>%
+  as_Spatial
+
+
+```
+
+```{r}
+sts <- state.name[!state.name %in% c("Alaska", "Hawaii")]
+stateBorders <- us_states(states = sts)
+```
+
+
+
+Plot the data for the tornado touchdown locations (`SigTorns`). Add a map of the United States. Color code the tornadoes by ORANGE: weak (F0, F1), RED: strong(F2, F3), BLACK: significant (F4, F5). 
+```{r}
+tm_shape(stateBorders, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70")  +
+#tm_shape(WeakTorns) +
+#  tm_bubbles(size = 0.1, col = "blue", border.col = "blue", alpha = 0.5) +
+tm_shape(StrongTorns) +
+  tm_bubbles(size = 0.3, col = "red", border.col = "red", alpha = 0.5) +
+tm_shape(SignificantTorns) +
+  tm_bubbles(size = 0.3, 
+             col = "black", 
+             border.col = "black", alpha = 0.5) +
+tm_add_legend('symbol', 
+	col = c("red", "black"),
+	border.col = "grey40",
+	labels = c('F2 - F3 Tornadoes','F4 - F5 Tornadoes'),
+	title="Fujita Ratings") +
+tm_layout(legend.show = TRUE,
+          legend.position = c("right", "bottom"),
+          legend.text.size = 0.8,
+          legend.title.size = 1.2,
+          attr.position = c("left", "bottom"), 
+          inner.margins = c(.01, .01, .01, .01))
+
+      
+```
+
 
 Create a figure of the tornado cluster density plot for all of the tornadoes (A) and only the strongest tornadoes (B). 
 
 Kernel Density: 
 
 ```{r}
-library(maptools)
-library(raster)
+library(extrafont)
+font_import()
+y
 ```
 
-```{r}
-library(ggplot2)
 
+```{r}
+library(scales)
 ggplot(stateBorders) +
   geom_sf(fill = NA, col = "gray70") + 
-  stat_density2d(aes(x = slon, y = slat, fill = stat(level)), alpha = .4, h = 4, 
+  stat_density2d(aes(x = slon, y = slat, fill = stat(level)), alpha = .4, h = 4, contour = TRUE,
                  geom = "polygon", data = HistoricalBigDayTornadoes) +
   scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
   labs(x = "Longitude", y = "Latitude", fill = "Density") +
   ggtitle("Density of Historical Big Day Tornadoes") +
   theme_bw() +
   #geom_sf(data = centroids, alpha = 0.4) +
-  theme(plot.title = element_text(hjust = 0.5))
-```
+  theme(plot.title = element_text(family = "Arial" , hjust = 0.5), legend.direction="horizontal", legend.position="bottom", legend.key.width = unit(1.5, 'cm'), legend.title = element_text("Tornado Density")) #+
+ # geom_point(data = HistoricalBigDayTornadoes, aes( x = slon, y = slat))
 
-```{r}
-ggplot(HistoricalBigDayTornadoes) +
-  geom_hex(bins=60, aes(x = slon, y = slat)) +
-  geom_sf(data = stateBorders, fill = NA, col = "gray70") +
-  theme_bw()
-```
 
+```
 
 What is the temporal distribution of tornado clusters? Year on the x axis, counts on the y, stacked bars shaded by maximum F rating. Group by 50 years. 
 
 ```{r}
-NumClusbyYear8035 <- HistoricalBigDays.sfdfT %>%
-  filter(Year < 1935) %>%
+NumClusbyYear <- HistoricalBigDays.sfdfT %>%
   group_by(Year, maxEF) %>%
-  summarize(count = n())
+  summarize(count = n(),
+            totTorn = sum(nT))
+```
 
-NumClusbyYear3590 <- HistoricalBigDays.sfdfT %>%
-  filter(Year >= 1935) %>%
-  group_by(Year, maxEF) %>%
-  summarize(count = n())
-
-p1 <- ggplot(NumClusbyYear8035, aes(fill = maxEF, y = count, x = Year)) +
-  geom_bar(position = "stack", stat = "identity") +
+```{r}
+numClus <- ggplot(NumClusbyYear) +
+  geom_bar(aes(fill = maxEF, y = count, x = Year), position = "stack", stat = "identity") +
+    geom_smooth(aes(y = count, x = Year), method = lm, se = FALSE, color = "red") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  scale_x_continuous(expand = c(0, 0), limits = c(1880, 1935), breaks = seq(1880, 1935, 5)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 16), breaks = seq(0, 16,2)) +
+  scale_x_continuous(expand = c(0, 0), limits = c(1880, 1990), breaks = seq(1880, 1990, 5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 20), breaks = seq(0, 20,2)) +
   labs(x = "Year", y = "Number of Clusters") +
   theme_minimal()
-p1#Group by 50 years.
+```
 
-p2 <- ggplot(NumClusbyYear3590, aes(fill = maxEF, y = count, x = Year)) +
-  geom_bar(position = "stack", stat = "identity") +
+```{r}
+totTorn <- ggplot(NumClusbyYear) +
+  geom_bar(aes(fill = maxEF, y = totTorn, x = Year), position = "stack", stat = "identity") +
+    geom_smooth(aes(y = totTorn, x = Year), method = lm, se = FALSE, color = "red") +
   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  scale_x_continuous(expand = c(0, 0), limits = c(1935, 1990), breaks = seq(1935, 1990, 5)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 16), breaks = seq(0, 16,2)) +
-  labs(x = "Year", y = "Number of Clusters") +
+  scale_x_continuous(expand = c(0, 0), limits = c(1880, 1990), breaks = seq(1880, 1990, 5)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 105), breaks = seq(0, 105,10)) +
+  labs(x = "Year", y = "Number of Tornadoes") +
   theme_minimal()
+```
 
+
+```{r}
 library(gridExtra)
-grid.arrange(p1, p2)
+grid.arrange(numClus,totTorn)
 ```
 
 Number of tornadoes by month, stacked bars shaded by maximum F rating. 
@@ -417,15 +469,32 @@ centroids %>%
   group_by(Month) %>%
   summarize(numClus = n())
 
-ggplot(stateBorders) +
+names <- array(month.name)
+
+p <- (ggplot(stateBorders) +
   geom_sf(fill = NA, color = "gray70") + 
   stat_density2d(aes(x = slon, y = slat, fill = ..level..), alpha = .5, h = 5,
                  geom = "polygon", data = HistoricalBigDayTornadoes) +
-  facet_wrap(~Ma, ncol = 3) +
+  facet_wrap(~Ma, ncol = 3, labeller = labeller(Ma = 
+                    c("Jan" = "January",
+                      "Feb" = "February",
+                      "Mar" = "March",
+                      "Apr" = "April",
+                      "May" = "May",
+                      "Jun" = "June",
+                      "Jul" = "July",
+                      "Aug" = "August",
+                      "Sep" = "September",
+                      "Oct" = "October",
+                      "Nov" = "November",
+                      "Dec" = "December"))) +
     scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
   labs(x = "Longitude", y = "Latitude", fill = "Density") +
   #scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
-  theme_minimal()
+  theme_minimal())
+
+p <- p + theme(axis.text.x = element_text(angle = 45), strip.text = element_text(size=16), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+p
 ```
 
 Figure of the number of clusters for each start hour of the day in CST. 
@@ -460,7 +529,7 @@ P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("A")
+  ggtitle("MAM")
 ```
 
 ```{r}
@@ -478,7 +547,7 @@ P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("B")
+  ggtitle("JJA")
 
 ```
 
@@ -497,7 +566,7 @@ P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("C")
+  ggtitle("SON")
 ```
 
 ```{r}
@@ -515,35 +584,15 @@ P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
-  ggtitle("D")
+  ggtitle("DJF")
 ```
 
 ```{r}
 library(gridExtra)
-grid.arrange(P1, P2, P3, P4)
+grid.arrange(P4, P1, P2, P3)
 ```
 
-Distribution of clusters by maximum F rating. 
 
-```{r}
-HistoricalBigDays.sfdfT %>%
-  group_by(maxEF) %>%
-  summarize(count = n()) %>%
-ggplot(aes(fill = maxEF, x = maxEF, y = count)) +
-  geom_bar(stat = "identity") +
-   scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
-  labs(x = "Hour (CST)", y = "Number of Clusters") +
-  theme_minimal()
-```
-
-Table: Top ten tornado clusters with the highest casualty counts. 
-
-```{r}
-HistoricalBigDays.sfdfT %>%
-  dplyr::select(cDate, nT, maxEF, GroupDayCas, GroupDayFat) %>%
-  arrange(desc(GroupDayCas)) %>%
-  head(10)
-```
 
 Figure: Annual # of casualties from tornadoes with their respective F-scale ratings color coded. 
 
@@ -624,33 +673,44 @@ omg <- HistoricalBigDays.sfdfT %>%
   mutate(decade = round(Year/10) * 10) 
   
 
-omg %>%
+x <- omg %>%
   group_by(decade) %>%
   summarize(NumClus = n(), 
             NumTorn = sum(nT),
             totcas = sum(GroupDayCas, na.rm = TRUE),
             freq = NumClus/dim(HistoricalBigDays.sfdfT)[1] * 100, 
             tot = NumTorn/NumClus)
+
 ```
+
+##Number of Casualties: 
+
+1. Create a figure of casualties over time
+
+2. Create a figure of total casualties by month with the 4 F ratings as separate bars. 
+
+********************************************************************
 
 April 3, 1974
 ID: 
 ```{r}
 Apr3 <- HistoricalBigDays.sfdfT %>%
-  filter(cDate == "1974-04-03", groupNumber == 286)
-Apr3 <- st_convex_hull(Apr3)
+  filter(cDate == "1974-04-03", groupNumber == 288)
+Apr3 <- as_Spatial(st_convex_hull(Apr3))
 
 Apr3centroid <- centroids %>%
-  filter(cDate == "1974-04-03", groupNumber == 286)
+  filter(cDate == "1974-04-03", groupNumber == 288)%>%
+  as_Spatial()
 
 Apr3tornadoes <- HistoricalBigDayTornadoes %>% 
-  filter(cDate == "1974-04-03", groupNumber == 286)
+  filter(cDate == "1974-04-03", groupNumber == 288)
 
 Apr3tornadoes <- Apr3tornadoes %>%
-  mutate(Hour2 = ifelse(Hour <= 6, Hour + 24, Hour))
+  mutate(Hour2 = ifelse(hour <= 6, hour + 24, hour)) %>%
+  as_Spatial
 ```
 
-**Make a map of the May 20 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
+**Make a map of the APRIL 3 1974 tornado day. Obtain the state and county boundaries from the `USAboundaries` package. **
 ```{r}
 Apr3tornadoes$Hour2 <- cut(Apr3tornadoes$Hour2, breaks=c(6,12,18,24,30))
 
