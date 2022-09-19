@@ -130,7 +130,7 @@ HistoricalGroups.sfdfT <- SigTorns %>%
             StartTime = min(DateTime),
             EndTime = max(DateTime),
             Duration = difftime(EndTime, StartTime, units = "secs"), 
-            cas = sum(inj + fat))
+            cas = sum(inj + fat, na.rm = TRUE))
 ```
 
 ```{r, eval = FALSE}
@@ -238,15 +238,130 @@ HistoricalBigDayTornadoes$mag[HistoricalBigDayTornadoes$mag == "F00"] <- "F3"
 ## Create Figure of Historical Groups: Example of clusters within the data. (A) The largest cluster in the data occurred between XX and XX. (B) The longest cluster in the data occurred between XX and XX. Each circle is a tornado genesis location colored by the day of occurrence. The black line is the minimum convex polygon surrounding all the genesis locations (convex hull)
 
 ```{r}
+#Remove the "groups" with no time/start date
+HistoricalGroups.sfdfT <- HistoricalGroups.sfdfT %>%
+  filter(groupNumber != 2)
+
+HistoricalGroupTornadoes <- HistoricalGroupTornadoes %>%
+  filter(groupNumber != 2)
+```
+
+```{r}
+LargeClus <- HistoricalGroups.sfdfT %>%
+  filter(groupNumber == 288)
+LargeClus <- st_convex_hull(LargeClus)
+
+LargeClusTorns <- HistoricalGroupTornadoes%>%
+  filter(groupNumber == 288)
+```
+
+```{r}
+clus1974 <- (tm_shape(stateBorders) + 
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.2, .2, .2, .2)) +
+#tm_shape(counties.sf) +
+#  tm_borders(col = "gray40", alpha = .3) +
+#  tm_scale_bar(width = 8, size = 8, color.dark = "gray70") +
+  #tm_format("World", legend.position = c("right", "top"),
+#                   attr.position = c("right", "top"),
+#                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+ #                  inner.margins = c(.2, .2, .2, .2)) +
+tm_shape(LargeClus, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "black", lwd = 3) +
+tm_shape(LargeClusTorns) +
+  tm_symbols(size = 4, col = "cDate", alpha = 0.8, palette = "YlOrRd", title.col = "Convective Day", border.alpha = 0) +
+      tm_layout(title = "April 3 - 4, 1974 \n 94 tornadoes", 
+              title.position = c("center", "top"), 
+              legend.title.size = 1.4,
+              legend.position = c("right", "bottom"), 
+              legend.stack = "horizontal",
+              legend.frame = FALSE, 
+              legend.text.size = 1.2, 
+              legend.width = -0.3, 
+              title.size = 1.5))
 
 ```
 
+Longest Cluster: 
+```{r}
+LongClus <- HistoricalGroups.sfdfT %>%
+  filter(groupNumber == 49)
+LongClus <- st_convex_hull(LongClus)
+
+LongClusTorns <- HistoricalGroupTornadoes%>%
+  filter(groupNumber == 49)
+```
+
+```{r}
+clus1908 <- (tm_shape(stateBorders) + 
+  tm_borders(col = "gray70", alpha = 1) +
+  tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
+  tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70") +
+  tm_layout(legend.bg.color = "white", 
+            legend.text.size = .75, 
+            attr.position = c("left", "bottom"), 
+            inner.margins = c(.2, .2, .2, .2)) +
+#tm_shape(counties.sf) +
+#  tm_borders(col = "gray40", alpha = .3) +
+#  tm_scale_bar(width = 8, size = 8, color.dark = "gray70") +
+  #tm_format("World", legend.position = c("right", "top"),
+#                   attr.position = c("right", "top"),
+#                   legend.frame = FALSE,
+                   #title = "May 30th Tornado Group",
+                   #title.size = 1.3,
+                   #title.position = c("left", "TOP"),
+ #                  inner.margins = c(.2, .2, .2, .2)) +
+tm_shape(LongClus, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
+  tm_borders(col = "black", lwd = 3) +
+tm_shape(LongClusTorns) +
+  tm_symbols(size = 4, col = "cDate", alpha = 0.8, palette = "YlOrRd", title.col = "Convective Day", border.alpha = 0) +
+      tm_layout(title = "April 22 - 25, 1908 \n 32 tornadoes", 
+              title.position = c("center", "top"), 
+              legend.title.size = 1.4,
+              legend.position = c("right", "bottom"), 
+              legend.stack = "horizontal",
+              legend.frame = FALSE, 
+              legend.text.size = 1.2, 
+              legend.width = -0.3, 
+              title.size = 1.5))
+
+```
+
+```{r}
+tmap_arrange(clus1974, clus1908)
+```
 
 ## Create Table: The total number of large groups and tornadoes by duration.
 
 ```{r}
-
+HistoricalGroups.sfdfT %>%
+  group_by(ncD) %>%
+  summarize(LargeGroups = n(),
+            NumTorn = sum(nT, na.rm = TRUE))
 ```
+
+********************************************************************************
+## Big Days: 
+
+What percentage of tornadoes occur in a big day of 6 or more tornadoes?
+```{r}
+dim(HistoricalBigDayTornadoes)[1]/ dim(HistoricalGroupTornadoes)[1]
+```
+
+```{r}
+x <- HistoricalBigDays.sfdfT %>%
+  group_by(cDate) %>%
+  summarize(tot = n())
+```
+
 
 March 27, 1882
 ID: 
