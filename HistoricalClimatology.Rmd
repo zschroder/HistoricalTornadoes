@@ -501,7 +501,7 @@ tm_layout(main.title = "A", legend.show = TRUE,
           legend.text.size = 0.8,
           legend.title.size = 1.2,
           attr.position = c("left", "bottom"), 
-          inner.margins = c(.25, .25, .25, .25)))
+          inner.margins = c(.3, .15, .15, .15)))
 
       
 ```
@@ -544,11 +544,11 @@ tm_layout(main.title = "B",
           legend.text.size = 0.8,
           legend.title.size = 1.2,
           attr.position = c("left", "bottom"), 
-          inner.margins = c(.25, .25, .25, .25)))
+          inner.margins = c(.3, .15, .15, .15)))
 ```
 
 ```{r}
-tmap_arrange(torn, cas)
+tmap_arrange(torn, cas, nrow = 1)
 ```
 
 Create a figure of the tornado cluster density plot for all of the tornadoes (A) and only the strongest tornadoes (B). 
@@ -659,11 +659,11 @@ p <- (ggplot(stateBorders) +
                       "Nov" = "November",
                       "Dec" = "December"))) +
     scale_fill_distiller(palette = "YlOrRd", direction  = 1) +
-  labs(x = "Longitude", y = "Latitude", fill = "Density") +
+  labs(x = "Longitude", y = "Latitude") +#, fill = "Density") +
   #scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
   theme_minimal())
 
-p <- p + theme(axis.text.x = element_text(angle = 45), strip.text = element_text(size=16), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+p <- p + theme(axis.text.x = element_text(angle = 45), strip.text = element_text(size=16), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"), legend.position="none")
 p
 ```
 
@@ -694,7 +694,7 @@ NumClusbyHour_MAM <- MAM %>%
 
 P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
   scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
@@ -712,7 +712,7 @@ NumClusbyHour_JJA <- JJA %>%
 
 P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
     scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
@@ -731,7 +731,7 @@ NumClusbyHour_SON <- SON %>%
 
 P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
     scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
@@ -749,7 +749,7 @@ NumClusbyHour_DJF <- DJF %>%
 
 P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue")) +
+  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
   scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
@@ -759,9 +759,9 @@ P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
 
 ```{r}
 library(gridExtra)
-grid.arrange(P4, P1, P2, P3)
+library(ggpubr)
+ggarrange(P4, P1, P2, P3, common.legend = TRUE, legend = "bottom")
 ```
-
 
 
 Figure: Annual # of casualties from tornadoes with their respective F-scale ratings color coded. 
