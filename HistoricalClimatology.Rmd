@@ -13,7 +13,7 @@ The goal of this research is to understand when and where tornado outbreaks occu
 
 Library the datasets used in this project: 
 ```{r}
-extrafont::loadfonts(device="win")
+#extrafont::loadfonts(device="win")
 suppressMessages(library(ggplot2))
 suppressMessages(library(tmap))
 suppressMessages(library(sf))
@@ -557,8 +557,8 @@ Kernel Density:
 
 ```{r}
 library(extrafont)
-font_import()
-y
+#font_import()
+#y
 ```
 
 
@@ -873,6 +873,8 @@ ID:
 ```{r}
 Apr3 <- HistoricalBigDays.sfdfT %>%
   filter(cDate == "1974-04-03", groupNumber == 288)
+Apr3area <- st_convex_hull(Apr3)
+st_area(Apr3area)
 Apr3 <- as_Spatial(st_convex_hull(Apr3))
 
 Apr3centroid <- centroids %>%
@@ -932,5 +934,13 @@ tm_shape(Apr3centroid) +
 )
 
 Apr31974
+```
+
+```{r}
+HistoricalBigDayTornadoes %>%
+  group_by(st) %>%
+  summarize(nC = n())%>%
+  arrange(desc(nC)) %>%
+  head(10)
 ```
 
