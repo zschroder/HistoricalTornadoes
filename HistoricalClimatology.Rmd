@@ -944,3 +944,13 @@ HistoricalBigDayTornadoes %>%
   head(10)
 ```
 
+```{r}
+library(stats)
+
+t.test(x$decade, x$NumClus,  data = x)
+t.test(x$decade, x$NumTorn,  data = x)
+t.test(x$decade, x$totcas,  data = x)
+
+```
+
+
