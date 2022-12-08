@@ -631,16 +631,20 @@ test <- ggplot(NumClusbyYear) +
   geom_bar(aes(y = normalized, x = Year, fill = pos), position = "stack", stat = "identity") +
  # geom_bar(aes(y = totTorn, x = Year, fill = "blue"), position = "stack", stat = "identity") +
     #geom_smooth(aes(y = totTorn, x = Year), method = lm, se = FALSE, color = "red") +
-  scale_fill_manual(values = c("red", "blue"), name = "", labels = c("Below Normal", "Above Normal")) +
+  scale_fill_manual(values = c("slategray", "deeppink4"), name = "", labels = c("Below Normal", "Above Normal")) +
   scale_x_continuous(expand = c(0, 0), limits = c(1880, 1990), breaks = seq(1880, 1990, 5)) +
   scale_y_continuous(expand = c(-0, 0), limits = c(-50, 100), breaks = seq(-50, 100,10)) +
   labs(x = "Year", y = "Number of Tornadoes") +
   theme_minimal()
-test + theme(legend.position = "bottom", legend.direction = "horizontal", axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1), axis.text=element_text(size=12),
-        axis.title=element_text(size=14), legend.text=element_text(size=12))
+test + theme(legend.position = "bottom", 
+             legend.direction = "horizontal", 
+             axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1), 
+             axis.text=element_text(size=12),
+             axis.title=element_text(size=14), 
+             legend.text=element_text(size=12), 
+             panel.grid.major.x = element_blank(),
+             panel.grid.minor.x = element_blank())
 ```
-
-
 
 ```{r}
 library(gridExtra)
