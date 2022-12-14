@@ -498,6 +498,7 @@ tm_shape(LargenT, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=
   tm_bubbles(col = "nT", border.col = "black", alpha = 0.8, palette = "Greens", title.col = "Tornadoes") +
 tm_layout(main.title = "A", legend.show = TRUE,
           legend.position = c("right", "bottom"),
+          legend.bg.color = "white",
           legend.text.size = 0.8,
           legend.title.size = 1.2,
           attr.position = c("left", "bottom"), 
@@ -540,6 +541,7 @@ tm_shape(LargeCas,
              title.col = "Casualties") +
 tm_layout(main.title = "B", 
           legend.show =TRUE,
+          legend.bg.color = "white",
           legend.position = c("right", "bottom"),
           legend.text.size = 0.8,
           legend.title.size = 1.2,
@@ -698,7 +700,8 @@ p <- (ggplot(stateBorders) +
   #scale_fill_gradient(low = "#FCBBA1", high = "#99000D") + 
   theme_minimal())
 
-p <- p + theme(axis.text.x = element_text(angle = 45), strip.text = element_text(size=16), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"), legend.position="none")
+p <- p + theme(axis.text.x = element_text(angle = 45, margin = margin(t = 20)), axis.text.y = element_text(margin = margin(r = 20)), axis.title.y = element_text( margin = margin(r=20)), strip.text = element_text(size=16), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"), legend.position="none")
+
 p
 ```
 
@@ -721,6 +724,12 @@ ggplot(NumClusbyHour, aes(fill = maxEF, y = count, x = Hour)) +
 Figure: Separate by summer and winter and plot the clusters by hour. Separate to MAM, DJF, JJA, SON
 
 ```{r}
+library(wesanderson)
+pal <- wes_palette("Zissou1", 5, type = "continuous")
+```
+
+
+```{r}
 MAM <- HistoricalBigDays.sfdfT %>%
   filter(Mo >=  3 & Mo <= 5)
 NumClusbyHour_MAM <- MAM %>%
@@ -729,12 +738,15 @@ NumClusbyHour_MAM <- MAM %>%
 
 P1 <- ggplot(NumClusbyHour_MAM, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
+  scale_fill_manual(values = pal, name = "Maximum Rating") +
   scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
   ggtitle("MAM")
+
+P1 <- P1 + theme(panel.grid.minor = element_blank(), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+P1
 ```
 
 ```{r}
@@ -747,13 +759,15 @@ NumClusbyHour_JJA <- JJA %>%
 
 P2 <- ggplot(NumClusbyHour_JJA, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
+  scale_fill_manual(values = pal, name = "Maximum Rating") +
     scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
   ggtitle("JJA")
 
+P2 <- P2 + theme(panel.grid.minor = element_blank(), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+P2
 ```
 
 ```{r}
@@ -766,12 +780,15 @@ NumClusbyHour_SON <- SON %>%
 
 P3 <- ggplot(NumClusbyHour_SON, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
+  scale_fill_manual(values = pal, name = "Maximum Rating") +
     scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
   ggtitle("SON")
+
+P3 <- P3 + theme(panel.grid.minor = element_blank(), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+P3
 ```
 
 ```{r}
@@ -784,12 +801,15 @@ NumClusbyHour_DJF <- DJF %>%
 
 P4 <- ggplot(NumClusbyHour_DJF, aes(fill = maxEF, y = count, x = Hour)) +
   geom_bar(position = "stack", stat = "identity") +
-  scale_fill_manual(values = c("slategray1", "steelblue2", "royalblue3", "navyblue"), name = "Maximum Rating") +
+  scale_fill_manual(values = pal, name = "Maximum Rating") +
   scale_x_continuous(expand = c(0, 0), limits = c(-.5, 23.5), breaks = seq(0, 23,1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), breaks = seq(0, 50,10)) +
   labs(x = "Hour (CST)", y = "Number of Clusters") +
   theme_minimal() +
   ggtitle("DJF")
+
+P4 <- P4 + theme(panel.grid.minor = element_blank(), axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold"))
+P4
 ```
 
 ```{r}
