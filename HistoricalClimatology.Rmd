@@ -494,12 +494,24 @@ cr <- RColorBrewer::brewer.pal(9, "Greens")
 cr <- c("#E5F5E0","#74C476","#41AB5D", "#238B45","#006D2C", "#00441B")
 
 torn <- (tm_shape(stateBorders) +
-  tm_text("state_abbr")+
+  #tm_text("state_abbr")+
   tm_borders(col = "gray70", alpha = 1) +
   tm_compass(size = 3, fontsize = 1, lwd = 2, color.dark = "gray70") +       
   tm_scale_bar(width = .3, size = 0.8, lwd = 1.75, color.dark = "gray70")  +
 #tm_shape(WeakTorns) +
 #  tm_bubbles(size = 0.1, col = "blue", border.col = "blue", alpha = 0.5) +
+tm_shape(stateBorders[!stateBorders$stusps%in% c("MI", "LA", "FL"),], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps') +
+tm_shape(stateBorders[stateBorders$stusps == "MI",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = -.75, xmod = .5) +
+tm_shape(stateBorders[stateBorders$stusps == "LA",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = .25, xmod = -.45) +
+  tm_shape(stateBorders[stateBorders$stusps == "FL",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = .25, xmod = .6) +
 tm_shape(LargenT, is.master = TRUE, projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
   tm_bubbles(col = "nT", border.col = "black", alpha = 0.9, n=5, palette = cr, title.col = "Tornadoes", breaks = c(15, 30, 45, 60, 75, 90, 105)) +
 tm_layout(main.title = "A", legend.show = TRUE,
@@ -524,7 +536,7 @@ LargeCas <- centroids %>%
   as_Spatial()
 
 cas <- (tm_shape(stateBorders) +
-          tm_text("state_abbr")+
+          #tm_text("state_abbr")+
   tm_borders(col = "gray70", 
              alpha = 1) +
   tm_compass(size = 3, 
@@ -537,6 +549,18 @@ cas <- (tm_shape(stateBorders) +
                color.dark = "gray70")  +
 #tm_shape(WeakTorns) +
 #  tm_bubbles(size = 0.1, col = "blue", border.col = "blue", alpha = 0.5) +
+tm_shape(stateBorders[!stateBorders$stusps%in% c("MI", "LA", "FL"),], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps') +
+tm_shape(stateBorders[stateBorders$stusps == "MI",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = -.75, xmod = .5) +
+tm_shape(stateBorders[stateBorders$stusps == "LA",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = .25, xmod = -.45) +
+  tm_shape(stateBorders[stateBorders$stusps == "FL",], projection ="+init=epsg:2163") +
+  tm_borders(alpha = 0.2) +
+  tm_text('stusps', ymod = .25, xmod = .6) +
 tm_shape(LargeCas, 
          is.master = TRUE, 
          projection = "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") +
